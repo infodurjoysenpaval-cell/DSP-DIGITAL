@@ -83,7 +83,7 @@ export const AdminIncompleteOrders: React.FC = () => {
       email: order.email || 'customer@dspmart.com',
       notes: order.notes || 'Converted from incomplete order recovery',
       items: order.items,
-      paymentMethod: order.paymentMethod || 'Manual Confirmation',
+      paymentMethod: (order.paymentMethod as any) || 'bkash',
       totalAmount: order.totalAmount,
       createdAt: new Date().toISOString(),
       status: 'pending',
@@ -297,7 +297,7 @@ export const AdminIncompleteOrders: React.FC = () => {
 
                       <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1">
                         <Clock className="w-3 h-3 text-slate-400" />
-                        <span>{new Date(order.lastUpdated).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>{new Date(order.lastActiveAt).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </td>
 
