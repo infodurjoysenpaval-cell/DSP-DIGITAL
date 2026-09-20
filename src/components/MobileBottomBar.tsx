@@ -12,7 +12,8 @@ interface MobileBottomBarProps {
   onFocusSearch: () => void;
   searchQuery: string;
   currentUser?: UserProfile | null;
-  onOpenAuth: (mode?: 'login' | 'register' | 'profile') => void;
+  onOpenAuth: (mode?: 'login' | 'register') => void;
+  onOpenDashboard?: (tab?: string) => void;
   onOpenMenu: () => void;
 }
 
@@ -21,6 +22,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
   onOpenCategories,
   currentUser,
   onOpenAuth,
+  onOpenDashboard,
   onOpenMenu,
 }) => {
   const phone = SHOP_INFO.whatsappNumber.replace(/[^0-9]/g, '');
@@ -39,7 +41,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
           href={whatsappUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex flex-col items-center justify-center py-1 text-slate-600 hover:text-blue-600 transition-colors"
+          className="flex flex-col items-center justify-center py-1 text-slate-600 hover:text-[#FF6B00] transition-colors"
         >
           <MessageSquare className="w-5 h-5 stroke-[1.8]" />
           <span className="text-[10px] sm:text-[11px] font-nav-text text-slate-600 mt-0.5">
@@ -51,7 +53,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
         <button
           id="mobile-nav-categories"
           onClick={onOpenCategories}
-          className="flex flex-col items-center justify-center py-1 text-slate-600 hover:text-blue-600 transition-colors"
+          className="flex flex-col items-center justify-center py-1 text-slate-600 hover:text-[#FF6B00] transition-colors"
         >
           <List className="w-5 h-5 stroke-[1.8]" />
           <span className="text-[10px] sm:text-[11px] font-nav-text text-slate-600 mt-0.5">
@@ -68,10 +70,10 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
           }}
           className="flex flex-col items-center justify-center py-0.5"
         >
-          <div className="w-12 h-7 sm:w-14 sm:h-8 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200/80 flex items-center justify-center shadow-2xs transition-transform active:scale-95">
+          <div className="w-12 h-7 sm:w-14 sm:h-8 rounded-2xl bg-orange-50 text-[#FF6B00] border border-orange-200/80 flex items-center justify-center shadow-2xs transition-transform active:scale-95">
             <Home className="w-5 h-5 stroke-[2.2]" />
           </div>
-          <span className="text-[10px] sm:text-[11px] font-nav-text text-blue-600 mt-0.5">
+          <span className="text-[10px] sm:text-[11px] font-nav-text text-[#FF6B00] mt-0.5 font-bold">
             Home
           </span>
         </button>
@@ -79,18 +81,24 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
         {/* 4. Account */}
         <button
           id="mobile-nav-account"
-          onClick={() => onOpenAuth(currentUser ? 'profile' : 'login')}
-          className="flex flex-col items-center justify-center py-1 text-slate-600 hover:text-blue-600 transition-colors"
+          onClick={() => {
+            if (currentUser) {
+              onOpenDashboard?.('dashboard');
+            } else {
+              onOpenAuth('login');
+            }
+          }}
+          className="flex flex-col items-center justify-center py-1 text-slate-600 hover:text-[#FF6B00] transition-colors"
         >
           {currentUser ? (
-            <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-btn-text">
+            <div className="w-5 h-5 rounded-full bg-[#FF6B00] text-white flex items-center justify-center text-[10px] font-bold">
               {currentUser.name.charAt(0).toUpperCase()}
             </div>
           ) : (
             <User className="w-5 h-5 stroke-[1.8]" />
           )}
           <span className="text-[10px] sm:text-[11px] font-nav-text text-slate-600 mt-0.5">
-            Account
+            {currentUser ? 'Account' : 'Sign In'}
           </span>
         </button>
 

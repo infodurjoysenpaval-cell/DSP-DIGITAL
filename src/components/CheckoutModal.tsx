@@ -10,7 +10,7 @@ interface CheckoutModalProps {
   items: CartItem[];
   onOrderSuccess: (order: OrderDetails) => void;
   currentUser?: UserProfile | null;
-  onOpenAuth?: (mode?: 'login' | 'register' | 'profile') => void;
+  onOpenAuth?: (mode?: 'login' | 'register') => void;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -175,13 +175,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => onOpenAuth?.('profile')}
-                className="px-2.5 py-1 text-[11px] font-bold text-blue-600 bg-white hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors shrink-0"
-              >
-                প্রোফাইল
-              </button>
+              <span className="px-2.5 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg shrink-0">
+                ভেরিফাইড
+              </span>
             </div>
           ) : (
             <div className="p-3.5 bg-gradient-to-r from-amber-50 to-orange-50/60 border border-amber-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">

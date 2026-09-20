@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingBag, Phone, Menu, X, ChevronRight, Zap, ShieldCheck, User, Sparkles, Star, MessageCircle, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { Search, ShoppingBag, Phone, Menu, X, ChevronRight, Zap, ShieldCheck, User, Sparkles, Star, MessageCircle, ExternalLink, CheckCircle2, Wallet } from 'lucide-react';
 import { SHOP_INFO, CATEGORIES, PRODUCTS } from '../data/storeData';
 import { Product, Category, UserProfile } from '../types';
 
@@ -14,7 +14,8 @@ interface HeaderProps {
   mobileMenuOpen?: boolean;
   setMobileMenuOpen?: (open: boolean) => void;
   currentUser?: UserProfile | null;
-  onOpenAuth?: (mode?: 'login' | 'register' | 'profile') => void;
+  onOpenAuth?: (mode?: 'login' | 'register') => void;
+  onOpenDashboard?: (tab?: string) => void;
   onLogoClick?: () => void;
   isAffiliateOpen?: boolean;
   setIsAffiliateOpen?: (open: boolean) => void;
@@ -32,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   setMobileMenuOpen: externalSetMenuOpen,
   currentUser,
   onOpenAuth,
+  onOpenDashboard,
   onLogoClick,
   isAffiliateOpen: externalAffiliateOpen,
   setIsAffiliateOpen: externalSetAffiliateOpen,
@@ -263,28 +265,46 @@ export const Header: React.FC<HeaderProps> = ({
               </a>
             </nav>
 
-            {/* Right: Sign In pill button + Cart button matching Image 2 */}
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Right: Wallet (when logged in) + Account/Sign In + Cart button */}
+            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+              {/* Wallet Balance Pill - Only visible when user is logged in */}
+              {currentUser && (
+                <button
+                  id="header-wallet-btn"
+                  onClick={() => onOpenDashboard?.('wallet')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-orange-50/60 text-slate-700 text-xs font-semibold rounded-full border border-slate-200 transition-all hover:border-[#FF6B00]/40 shadow-2xs active:scale-95"
+                  title="My Wallet Balance"
+                >
+                  <Wallet className="w-3.5 h-3.5 text-[#FF6B00]" />
+                  <span className="font-price-text font-bold text-slate-900">
+                    ৳{currentUser.walletBalance || 0}
+                  </span>
+                </button>
+              )}
+
+              {/* Account / Sign In Button */}
               {currentUser ? (
                 <button
                   id="header-user-profile-btn"
-                  onClick={() => onOpenAuth?.('profile')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-[#0F172A] text-xs font-btn-text rounded-full border border-slate-200 transition-colors shadow-2xs"
-                  title="My Account"
+                  onClick={() => onOpenDashboard?.('dashboard')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-[#0F172A] text-xs font-semibold rounded-full border border-slate-200 transition-colors shadow-2xs active:scale-95"
+                  title="My Account Dashboard"
                 >
-                  <div className="w-5 h-5 rounded-full bg-[#3B82F6] text-white flex items-center justify-center text-[10px] font-price-text shadow-xs">
+                  <div className="w-5 h-5 rounded-full bg-[#FF6B00] text-white flex items-center justify-center text-[10px] font-bold shadow-2xs">
                     {currentUser.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="hidden sm:inline max-w-[80px] truncate font-btn-text">{currentUser.name.split(' ')[0]}</span>
+                  <span className="hidden sm:inline max-w-[85px] truncate font-btn-text text-slate-800">
+                    {currentUser.name.split(' ')[0]}
+                  </span>
                 </button>
               ) : (
                 <button
                   id="header-login-btn"
                   onClick={() => onOpenAuth?.('login')}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs font-btn-text rounded-full shadow-xs hover:shadow transition-all active:scale-95"
-                  title="Customer Sign In"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-800 hover:text-[#FF6B00] text-xs font-semibold rounded-full border border-slate-200 transition-all shadow-2xs active:scale-95"
+                  title="Sign In"
                 >
-                  <User className="w-3.5 h-3.5" />
+                  <User className="w-3.5 h-3.5 text-slate-600" />
                   <span className="font-btn-text">Sign In</span>
                 </button>
               )}
@@ -298,7 +318,7 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <div className="relative">
                   <ShoppingBag className="w-4 h-4 text-[#0F172A]" />
-                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 bg-[#3B82F6] text-white text-[10px] font-price-text rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 bg-[#FF6B00] text-white text-[10px] font-price-text font-bold rounded-full flex items-center justify-center">
                     {cartCount}
                   </span>
                 </div>
@@ -425,11 +445,11 @@ export const Header: React.FC<HeaderProps> = ({
                     <button
                       onClick={() => {
                         setMobileMenuOpen(false);
-                        onOpenAuth?.('profile');
+                        onOpenDashboard?.('dashboard');
                       }}
-                      className="px-2.5 py-1 text-xs font-bold text-blue-600 bg-white border border-blue-200 rounded-lg shadow-2xs"
+                      className="px-2.5 py-1 text-xs font-bold text-[#FF6B00] bg-white border border-orange-200 rounded-lg shadow-2xs"
                     >
-                      My Account
+                      My Dashboard
                     </button>
                   </div>
                 ) : (

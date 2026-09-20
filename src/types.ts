@@ -128,6 +128,9 @@ export interface UserProfile {
   email: string;
   phone: string;
   avatar?: string;
+  walletBalance?: number;
+  referralCode?: string;
+  referredBy?: string;
   createdAt: string;
 }
 
@@ -139,8 +142,10 @@ export interface OrderDetails {
   email: string;
   notes?: string;
   items: CartItem[];
-  paymentMethod: 'bkash' | 'nagad' | 'rocket' | 'bank';
+  paymentMethod: 'bkash' | 'nagad' | 'rocket' | 'bank' | 'wallet';
   transactionId?: string;
   totalAmount: number;
+  status?: 'pending' | 'delivered' | 'processing' | 'cancelled';
+  licenseKey?: string;
   createdAt: string;
 }

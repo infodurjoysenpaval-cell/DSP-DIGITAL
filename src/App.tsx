@@ -11,6 +11,7 @@ import { Footer } from './components/Footer';
 import { WhatsAppFloating } from './components/WhatsAppFloating';
 import { MobileBottomBar } from './components/MobileBottomBar';
 import { AuthAccountModal } from './components/AuthAccountModal';
+import { UserAccountDashboard } from './components/UserAccountDashboard';
 import { CustomerReviewsStats } from './components/CustomerReviewsStats';
 import { PRODUCTS, CATEGORIES, SHOP_INFO } from './data/storeData';
 import { Product, VariationItem, CartItem, OrderDetails, UserProfile } from './types';
@@ -18,6 +19,10 @@ import { getCurrentUser } from './utils/authStorage';
 import { Sparkles, Zap, Flame, Shield, ArrowUpDown, Check, RefreshCw, ChevronRight, ShieldCheck, ArrowLeft } from 'lucide-react';
 
 export default function App() {
+  // Main view state ('store' or 'dashboard')
+  const [currentView, setCurrentView] = useState<'store' | 'dashboard'>('store');
+  const [dashboardTab, setDashboardTab] = useState<string>('dashboard');
+
   // Countdown Timer for New Arrivals (Matching Image 1: 0-15 Hours, 0-52 Mins, 0-7 Sec)
   const [countdown, setCountdown] = useState({ hours: 15, mins: 52, secs: 7 });
 
@@ -66,7 +71,7 @@ export default function App() {
   // Authentication & Customer state
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => getCurrentUser());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState<'login' | 'register' | 'profile'>('login');
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
 
   // Filters state
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -108,7 +113,21 @@ export default function App() {
     return () => window.removeEventListener('popstate', syncProductFromUrl);
   }, []);
 
+  // Open customer account dashboard
+  const handleOpenDashboard = (tab?: string) => {
+    if (!currentUser) {
+      setAuthModalMode('login');
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setDashboardTab(tab || 'dashboard');
+    setCurrentView('dashboard');
+    setSelectedProduct(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSelectProduct = (product: Product) => {
+    setCurrentView('store');
     setSelectedProduct(product);
     window.scrollTo({ top: 0, behavior: 'instant' });
     try {
@@ -119,6 +138,7 @@ export default function App() {
   };
 
   const handleBackFromProduct = () => {
+    setCurrentView('store');
     setSelectedProduct(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     try {
@@ -355,16 +375,33 @@ export default function App() {
         setMobileMenuOpen={setMobileMenuOpen}
         currentUser={currentUser}
         onOpenAuth={(mode) => {
-          setAuthModalMode(mode || (currentUser ? 'profile' : 'login'));
+          setAuthModalMode(mode || (currentUser ? 'login' : 'login'));
           setIsAuthModalOpen(true);
         }}
+        onOpenDashboard={handleOpenDashboard}
         onLogoClick={handleBackFromProduct}
         isAffiliateOpen={isAffiliateOpen}
         setIsAffiliateOpen={setIsAffiliateOpen}
       />
 
       <main className="flex-1">
-        {selectedProduct ? (
+        {currentView === 'dashboard' && currentUser ? (
+          <UserAccountDashboard
+            currentUser={currentUser}
+            onUserChange={(updated) => {
+              setCurrentUser(updated);
+              if (!updated) {
+                setCurrentView('store');
+              }
+            }}
+            onBrowseProducts={() => {
+              setCurrentView('store');
+              setSelectedProduct(null);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            initialTab={dashboardTab}
+          />
+        ) : selectedProduct ? (
           <ProductDetailPage
             product={selectedProduct}
             onBack={handleBackFromProduct}
@@ -379,7 +416,7 @@ export default function App() {
             }}
             onAddToCart={(prod, variation, qty) => handleAddToCart(prod, variation, qty || 1)}
             onBuyNow={(prod, variation, qty) => handleQuickBuy(prod, variation, qty || 1)}
-            onOpenAffiliate={() => setIsAffiliateOpen(true)}
+            onOpenAffiliate={() => handleOpenDashboard('affiliate')}
           />
         ) : (
           <>
@@ -718,11 +755,14 @@ export default function App() {
     )}
   </main>
 
-  {/* Customer Reviews & Stats Section */}
-  <CustomerReviewsStats />
+  {/* Customer Reviews & Stats Section (only shown on store view) */}
+  {currentView !== 'dashboard' && <CustomerReviewsStats />}
 
   {/* Footer */}
-  <Footer onSelectCategory={(slug) => setSelectedCategory(slug)} />
+  <Footer onSelectCategory={(slug) => {
+    setCurrentView('store');
+    setSelectedCategory(slug);
+  }} />
 
   {/* Floating WhatsApp Quick Support */}
   <WhatsAppFloating />
@@ -756,9 +796,10 @@ export default function App() {
     searchQuery={searchQuery}
     currentUser={currentUser}
     onOpenAuth={(mode) => {
-      setAuthModalMode(mode || (currentUser ? 'profile' : 'login'));
+      setAuthModalMode(mode || 'login');
       setIsAuthModalOpen(true);
     }}
+    onOpenDashboard={handleOpenDashboard}
     onOpenMenu={() => setMobileMenuOpen((prev) => !prev)}
   />
 
@@ -797,10 +838,7 @@ export default function App() {
           }
         }}
         initialMode={authModalMode}
-        onStartShopping={() => {
-          const el = document.getElementById('products-section');
-          el?.scrollIntoView({ behavior: 'smooth' });
-        }}
+        onOpenDashboard={() => handleOpenDashboard('dashboard')}
       />
 
       {/* Order Success Screen */}
@@ -808,8 +846,7 @@ export default function App() {
         order={completedOrder}
         onClose={() => setCompletedOrder(null)}
         onViewOrders={() => {
-          setAuthModalMode('profile');
-          setIsAuthModalOpen(true);
+          handleOpenDashboard('orders');
         }}
       />
     </div>
