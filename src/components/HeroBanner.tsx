@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Zap, ShieldCheck, Headphones, CreditCard } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Zap, ShieldCheck, Headphones, Lock } from 'lucide-react';
 import { CAROUSELS } from '../data/storeData';
 
 export const HeroBanner: React.FC = () => {
@@ -22,10 +22,10 @@ export const HeroBanner: React.FC = () => {
   };
 
   return (
-    <section className="w-full max-w-[1600px] 2xl:max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-      {/* Main Carousel Banner with Apple-Style Clean Border */}
-      <div className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
-        <div className="relative overflow-hidden bg-white aspect-[2.6/1] min-h-[160px] sm:min-h-[240px] md:min-h-[320px]">
+    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 sm:pt-5">
+      {/* Main Carousel Banner with Proportional Responsive Height */}
+      <div className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-slate-900 shadow-sm overflow-hidden">
+        <div className="relative overflow-hidden w-full h-[180px] xs:h-[210px] sm:h-[280px] md:h-[340px] lg:h-[380px] max-h-[400px]">
           {CAROUSELS.map((banner, index) => (
             <div
               key={banner._id}
@@ -37,7 +37,7 @@ export const HeroBanner: React.FC = () => {
                 src={banner.images[0]}
                 alt={banner.name || 'DSP Digital Mart Promo Banner'}
                 referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover object-center"
               />
             </div>
           ))}
@@ -82,45 +82,51 @@ export const HeroBanner: React.FC = () => {
         </div>
       </div>
 
-      {/* Trust Badges Highlights with Harmonized Palette */}
-      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-2xs hover:border-blue-300 hover:shadow-xs transition-all flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Zap className="w-5 h-5 fill-current" />
+      {/* Trust Badges Highlights - Matched to Website Brand Blue */}
+      <div className="mt-4 sm:mt-6 pt-1 pb-4 border-b border-slate-200/80">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-4 gap-x-2 sm:gap-6">
+          {/* Item 1: Instant Delivery */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-blue-50 text-[#0052FF] flex items-center justify-center shrink-0 border border-blue-100/80">
+              <Zap className="w-5 h-5 fill-current" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-[#0F172A] tracking-tight truncate">Instant Delivery</h4>
+              <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate">Automated, 24/7</p>
+            </div>
           </div>
-          <div>
-            <h4 className="text-xs sm:text-sm font-sub-heading text-[#0F172A]">Instant Delivery</h4>
-            <p className="text-[11px] text-slate-500 font-body-text">Delivered immediately after order</p>
-          </div>
-        </div>
 
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-2xs hover:border-blue-300 hover:shadow-xs transition-all flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-5 h-5" />
+          {/* Item 2: 100% Authentic */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-blue-50 text-[#0052FF] flex items-center justify-center shrink-0 border border-blue-100/80">
+              <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-[#0F172A] tracking-tight truncate">100% Authentic</h4>
+              <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate">Genuine products</p>
+            </div>
           </div>
-          <div>
-            <h4 className="text-xs sm:text-sm font-sub-heading text-[#0F172A]">100% Genuine License</h4>
-            <p className="text-[11px] text-slate-500 font-body-text">Official & secure subscriptions</p>
-          </div>
-        </div>
 
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-2xs hover:border-blue-300 hover:shadow-xs transition-all flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-            <Headphones className="w-5 h-5" />
+          {/* Item 3: Safe Payment */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-blue-50 text-[#0052FF] flex items-center justify-center shrink-0 border border-blue-100/80">
+              <Lock className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-[#0F172A] tracking-tight truncate">Safe Payment</h4>
+              <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate">bKash · Nagad · Card</p>
+            </div>
           </div>
-          <div>
-            <h4 className="text-xs sm:text-sm font-sub-heading text-[#0F172A]">24/7 Live Support</h4>
-            <p className="text-[11px] text-slate-500 font-body-text">Quick support via WhatsApp</p>
-          </div>
-        </div>
 
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-2xs hover:border-blue-300 hover:shadow-xs transition-all flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-            <CreditCard className="w-5 h-5" />
-          </div>
-          <div>
-            <h4 className="text-xs sm:text-sm font-sub-heading text-[#0F172A]">Easy Payment</h4>
-            <p className="text-[11px] text-slate-500 font-body-text">bKash, Nagad, Rocket & Bank</p>
+          {/* Item 4: 24/7 Support */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-blue-50 text-[#0052FF] flex items-center justify-center shrink-0 border border-blue-100/80">
+              <Headphones className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-[#0F172A] tracking-tight truncate">24/7 Support</h4>
+              <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate">Always here to help</p>
+            </div>
           </div>
         </div>
       </div>

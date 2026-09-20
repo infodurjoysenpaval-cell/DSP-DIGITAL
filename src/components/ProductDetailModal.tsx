@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShoppingBag, Check, ShieldCheck, Zap, MessageCircle, ChevronDown, ChevronUp, Share2 } from 'lucide-react';
+import { X, ShoppingBag, Check, ShieldCheck, Zap, MessageCircle, ChevronDown, ChevronUp, Share2, Star } from 'lucide-react';
 import { Product, VariationItem } from '../types';
 import { SHOP_INFO } from '../data/storeData';
+import { getThemeConfig } from '../utils/adminStore';
+import { getVariationDimensions, findMatchingVariation } from '../utils/variationUtils';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -17,18 +19,38 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onBuyNow,
 }) => {
   const [selectedVariation, setSelectedVariation] = useState<VariationItem | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<string>('');
+  const [selectedValidity, setSelectedValidity] = useState<string>('');
   const [selectedImage, setSelectedImage] = useState<string>('');
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<'desc' | 'faq' | 'warranty'>('desc');
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [lang, setLang] = useState<'en' | 'bn'>(() => {
+    const cfg = getThemeConfig();
+    return cfg.checkoutLanguage === 'bn' ? 'bn' : 'en';
+  });
+
+  useEffect(() => {
+    const handleThemeUpdate = () => {
+      const cfg = getThemeConfig();
+      setLang(cfg.checkoutLanguage === 'bn' ? 'bn' : 'en');
+    };
+    window.addEventListener('dsp_theme_updated', handleThemeUpdate);
+    return () => window.removeEventListener('dsp_theme_updated', handleThemeUpdate);
+  }, []);
 
   useEffect(() => {
     if (product) {
-      const defaultVar = product.variationList && product.variationList.length > 0
-        ? product.variationList.find((v) => v.isDefault) || product.variationList[0]
-        : null;
-      setSelectedVariation(defaultVar || null);
+      const dim = getVariationDimensions(product);
+      const defaultP = dim.plans[0] || '';
+      const defaultV = dim.validities[0] || '';
+
+      setSelectedPlan(defaultP);
+      setSelectedValidity(defaultV);
+
+      const matched = findMatchingVariation(product, defaultP, defaultV);
+      setSelectedVariation(matched || (product.variationList?.[0] ?? null));
       setSelectedImage(product.images[0] || '');
       setQuantity(1);
       setActiveTab('desc');
@@ -45,6 +67,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   }, [product]);
 
   if (!product) return null;
+
+  const isBn = lang === 'bn';
+
+  const dimensions = getVariationDimensions(product);
+  const plans = dimensions.plans;
+  const validities = dimensions.validities;
+  const planLabel = dimensions.planLabel;
+  const validityLabel = dimensions.validityLabel;
 
   const salePrice = selectedVariation ? selectedVariation.salePrice : (product.salePrice || 0);
   const regularPrice = selectedVariation ? selectedVariation.regularPrice : (product.regularPrice || 0);
@@ -76,7 +106,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         {/* Header Bar */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/70">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            ডিজিটাল প্রোডাক্ট বিস্তারিত (Product Details)
+            {isBn ? 'ডিজিটাল প্রোডাক্ট বিস্তারিত' : 'Product Details'}
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -87,7 +117,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <Share2 className="w-4 h-4" />
               {copiedLink && (
                 <span className="absolute -top-7 right-0 bg-slate-800 text-white text-[10px] px-2 py-0.5 rounded shadow">
-                  লিংক কপি হয়েছে!
+                  {isBn ? 'লিংক কপি হয়েছে!' : 'Link copied!'}
                 </span>
               )}
             </button>
@@ -136,10 +166,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {/* Assurance Callout */}
               <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5 space-y-2 text-xs text-blue-900">
                 <div className="flex items-center gap-2 font-bold text-blue-700">
-                  <ShieldCheck className="w-4 h-4" /> ১০০% সুরক্ষিত ও অফিসিয়াল এক্সেস
+                  <ShieldCheck className="w-4 h-4" /> {isBn ? '১০০% সুরক্ষিত ও অফিসিয়াল এক্সেস' : '100% Official & Secure License'}
                 </div>
                 <p className="text-blue-800/80 leading-relaxed text-[11px]">
-                  অর্ডার কনফার্ম করার পর আপনার ইমেইল বা হোয়াটসঅ্যাপে অফিসিয়াল লাইসেন্স কী অথবা লগইন তথ্য সরবরাহ করা হবে।
+                  {isBn
+                    ? 'অর্ডার কনফার্ম করার পর আপনার ইমেইল বা হোয়াটসঅ্যাপে অফিসিয়াল লাইসেন্স কী অথবা লগইন তথ্য সরবরাহ করা হবে।'
+                    : 'Official license keys or activation details will be delivered to your email or WhatsApp immediately after payment.'}
                 </p>
               </div>
             </div>
@@ -151,11 +183,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   {discountPercent > 0 && (
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-offer-text bg-red-600 text-white">
-                      {discountPercent}% ছাড়
+                      {discountPercent}% {isBn ? 'ছাড়' : 'OFF'}
                     </span>
                   )}
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-btn-text bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                    <Check className="w-3 h-3 stroke-[3]" /> ইন স্টক / ইনস্ট্যান্ট
+                    <Check className="w-3 h-3 stroke-[3]" /> {isBn ? 'ইন স্টক / ইনস্ট্যান্ট' : 'In Stock / Instant'}
                   </span>
                 </div>
 
@@ -165,46 +197,79 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </h1>
 
                 {/* Pricing Display */}
-                <div className="mt-3 p-3 bg-white rounded-2xl border border-slate-200 flex items-baseline gap-3">
-                  <span className="text-2xl sm:text-3xl font-price-text text-[#0F172A]">
-                    ৳{salePrice.toLocaleString()}
+                <div className="mt-3 p-3 bg-white rounded-2xl border border-slate-200 flex items-baseline flex-wrap gap-2.5">
+                  <span className="text-2xl sm:text-3xl font-black text-[#2563EB]">
+                    ৳ {salePrice.toLocaleString()}
                   </span>
                   {regularPrice > salePrice && (
-                    <span className="text-sm sm:text-base font-price-text text-slate-400 line-through">
-                      ৳{regularPrice.toLocaleString()}
-                    </span>
-                  )}
-                  {discountPercent > 0 && (
-                    <span className="text-xs font-price-text text-blue-600">
-                      (সাশ্রয়: ৳{(regularPrice - salePrice).toLocaleString()})
-                    </span>
+                    <>
+                      <span className="text-xs font-semibold text-[#FF7043] bg-orange-50 border border-orange-200 px-2 py-0.5 rounded">
+                        ৳ {(regularPrice - salePrice).toLocaleString()} Off
+                      </span>
+                      <span className="text-sm font-normal text-slate-400 line-through">
+                        ৳ {regularPrice.toLocaleString()}
+                      </span>
+                    </>
                   )}
                 </div>
 
-                {/* Variations Selector */}
-                {product.variationList && product.variationList.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <label className="text-xs font-sub-heading text-[#0F172A] block uppercase tracking-wider">
-                      প্যাকেজ / সাবস্ক্রিপশন প্ল্যান নির্বাচন করুন:
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {product.variationList.map((item) => {
-                        const isSelected = selectedVariation?._id === item._id;
+                {/* Plan Selector */}
+                {plans.length > 0 && (
+                  <div className="mt-3 flex items-center gap-2.5">
+                    <span className="text-xs font-semibold text-slate-700 min-w-[50px]">
+                      {planLabel}:
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {plans.map((p) => {
+                        const isSelected = selectedPlan === p;
                         return (
                           <button
-                            key={item._id}
-                            id={`var-btn-${item._id}`}
-                            onClick={() => setSelectedVariation(item)}
-                            className={`px-3 py-2.5 rounded-xl border text-left transition-all ${
+                            key={p}
+                            id={`modal-plan-btn-${p.replace(/\s+/g, '-').toLowerCase()}`}
+                            onClick={() => {
+                              setSelectedPlan(p);
+                              const matched = findMatchingVariation(product, p, selectedValidity);
+                              if (matched) setSelectedVariation(matched);
+                            }}
+                            className={`px-3 py-1 rounded-md text-xs font-medium transition-all border ${
                               isSelected
-                                ? 'border-[#3B82F6] bg-[#3B82F6]/10 text-[#0F172A] ring-2 ring-[#3B82F6]/30 shadow-xs'
-                                : 'border-slate-200 bg-white hover:border-blue-400 text-slate-700'
+                                ? 'border-slate-300 text-slate-800 bg-white shadow-2xs ring-1 ring-slate-300 font-semibold'
+                                : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300'
                             }`}
                           >
-                            <div className="text-xs font-body-text">{item.name}</div>
-                            <div className="text-xs font-price-text text-[#0F172A] mt-0.5">
-                              ৳{item.salePrice.toLocaleString()}
-                            </div>
+                            {p}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Validity Selector */}
+                {validities.length > 0 && (
+                  <div className="mt-2.5 flex items-center gap-2.5">
+                    <span className="text-xs font-semibold text-slate-700 min-w-[50px]">
+                      {validityLabel}:
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {validities.map((v) => {
+                        const isSelected = selectedValidity === v;
+                        return (
+                          <button
+                            key={v}
+                            id={`modal-validity-btn-${v.replace(/\s+/g, '-').toLowerCase()}`}
+                            onClick={() => {
+                              setSelectedValidity(v);
+                              const matched = findMatchingVariation(product, selectedPlan, v);
+                              if (matched) setSelectedVariation(matched);
+                            }}
+                            className={`px-3 py-1 rounded-md text-xs font-medium transition-all border ${
+                              isSelected
+                                ? 'border-slate-300 text-slate-800 bg-white shadow-2xs ring-1 ring-slate-300 font-semibold'
+                                : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300'
+                            }`}
+                          >
+                            {v}
                           </button>
                         );
                       })}
@@ -215,7 +280,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 {/* Quantity */}
                 <div className="mt-4 flex items-center gap-3">
                   <label className="text-xs font-sub-heading text-[#0F172A] uppercase tracking-wider">
-                    পরিমাণ:
+                    {isBn ? 'পরিমাণ:' : 'Quantity:'}
                   </label>
                   <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-white">
                     <button
@@ -244,7 +309,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     className="w-full py-3 bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.98] text-white font-btn-text text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
                   >
                     <Zap className="w-4 h-4 fill-current" />
-                    <span>এখনই কিনুন</span>
+                    <span>{isBn ? 'এখনই কিনুন' : 'Buy Now'}</span>
                   </button>
 
                   <button
@@ -253,7 +318,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     className="w-full py-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-400 active:scale-[0.98] text-[#0F172A] font-btn-text text-sm rounded-xl transition-all flex items-center justify-center gap-2"
                   >
                     <ShoppingBag className="w-4 h-4 text-[#2563EB]" />
-                    <span>কার্টে যোগ করুন</span>
+                    <span>{isBn ? 'কার্টে যোগ করুন' : 'Add to Cart'}</span>
                   </button>
                 </div>
 
@@ -266,7 +331,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   className="w-full py-2.5 bg-[#25D366] hover:bg-[#20ba59] text-white font-btn-text text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs"
                 >
                   <MessageCircle className="w-4 h-4 fill-current" />
-                  <span>সরাসরি হোয়াটসঅ্যাপে অর্ডার করুন</span>
+                  <span>{isBn ? 'হোয়াটসঅ্যাপে অর্ডার করুন' : 'Order via WhatsApp'}</span>
                 </a>
               </div>
             </div>
@@ -284,7 +349,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     : 'text-slate-500 hover:text-[#0F172A]'
                 }`}
               >
-                বিস্তারিত বিবরণ (Description)
+                {isBn ? 'বিস্তারিত বিবরণ' : 'Description'}
               </button>
 
               {product.faqList && product.faqList.length > 0 && (
@@ -296,7 +361,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       : 'text-slate-500 hover:text-[#0F172A]'
                   }`}
                 >
-                  প্রশ্নোত্তর (FAQ - {product.faqList.length})
+                  {isBn ? `প্রশ্নোত্তর (${product.faqList.length})` : `FAQs (${product.faqList.length})`}
                 </button>
               )}
 
@@ -308,7 +373,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     : 'text-slate-500 hover:text-[#0F172A]'
                 }`}
               >
-                ডেলিভারি ও সাপোর্ট
+                {isBn ? 'ডেলিভারি ও সাপোর্ট' : 'Delivery & Support'}
               </button>
             </div>
 
@@ -321,12 +386,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     className="overflow-x-auto"
                   />
                 ) : (
-                  <p>{product.seoDescription || product.shortDescription || 'অফিসিয়াল ও নির্ভরযোগ্য ডিজিটাল সার্ভিস।'}</p>
+                  <p>{product.seoDescription || product.shortDescription || (isBn ? 'অফিসিয়াল ও নির্ভরযোগ্য ডিজিটাল সার্ভিস।' : 'Official & genuine digital license service.')}</p>
                 )}
 
                 {product.seoKeyword && (
                   <div className="mt-4 pt-4 border-t border-slate-100">
-                    <span className="text-[11px] font-semibold text-slate-400">ট্যাগস: </span>
+                    <span className="text-[11px] font-semibold text-slate-400">{isBn ? 'ট্যাগস: ' : 'Tags: '}</span>
                     <span className="text-[11px] text-slate-500">
                       {product.seoKeyword.split(',').slice(0, 10).join(', ')}
                     </span>
@@ -367,16 +432,20 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {activeTab === 'warranty' && (
               <div className="text-xs sm:text-sm text-slate-700 space-y-3 font-body-text">
                 <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5">
-                  <h4 className="font-sub-heading text-emerald-800">✅ ওয়ারেন্টি ও রিপ্লেসমেন্ট পলিসি</h4>
+                  <h4 className="font-sub-heading text-emerald-800">{isBn ? '✅ ওয়ারেন্টি ও রিপ্লেসমেন্ট পলিসি' : '✅ Warranty & Replacement Policy'}</h4>
                   <p className="text-emerald-700 text-xs font-body-text">
-                    প্রতিটি ডিজিটাল প্রোডাক্ট ও সাবস্ক্রিপশনে নির্দিষ্ট মেয়াদের জন্য ফুল-টাইম ওয়ারেন্টি এবং প্রতিস্থাপন সাপোর্ট প্রদান করা হয়।
+                    {isBn
+                      ? 'প্রতিটি ডিজিটাল প্রোডাক্ট ও সাবস্ক্রিপশনে নির্দিষ্ট মেয়াদের জন্য ফুল-টাইম ওয়ারেন্টি এবং প্রতিস্থাপন সাপোর্ট প্রদান করা হয়।'
+                      : 'Full warranty and replacement support are provided for all digital licenses and subscriptions for the stated duration.'}
                   </p>
                 </div>
 
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-1.5">
-                  <h4 className="font-sub-heading text-blue-800">⚡ ইনস্ট্যান্ট ডেলিভারি প্রক্রিয়া</h4>
+                  <h4 className="font-sub-heading text-blue-800">{isBn ? '⚡ ইনস্ট্যান্ট ডেলিভারি প্রক্রিয়া' : '⚡ Instant Delivery Process'}</h4>
                   <p className="text-blue-700 text-xs font-body-text">
-                    অর্ডার করার পর বিকাশ/নগদ/রকেটে পেমেন্ট কনফার্মেশনের পর কয়েক মিনিটের মধ্যে আপনার প্রদানকৃত ইমেইল বা হোয়াটসঅ্যাপে ডেলিভারি সম্পন্ন হবে।
+                    {isBn
+                      ? 'অর্ডার করার পর বিকাশ/নগদ/রকেটে পেমেন্ট কনফার্মেশনের পর কয়েক মিনিটের মধ্যে আপনার প্রদানকৃত ইমেইল বা হোয়াটসঅ্যাপে ডেলিভারি সম্পন্ন হবে।'
+                      : 'After payment confirmation via bKash/Nagad/Card, your license or login info will be delivered to your email or WhatsApp within minutes.'}
                   </p>
                 </div>
               </div>

@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { Mail, Phone, MapPin, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Phone, MapPin, X, CheckCircle, ShieldCheck } from 'lucide-react';
 import { SHOP_INFO } from '../data/storeData';
+import { getPage, getAllPages } from '../utils/pagesStorage';
+import { PolicyPage } from '../types';
 
 interface FooterProps {
   onSelectCategory?: (slug: string | null) => void;
@@ -19,7 +21,16 @@ type PolicyType =
 
 export const Footer: React.FC<FooterProps> = () => {
   const [activeModal, setActiveModal] = useState<PolicyType>(null);
+  const [pagesVersion, setPagesVersion] = useState(0);
   const phone = SHOP_INFO.whatsappNumber.replace(/[^0-9]/g, '');
+
+  useEffect(() => {
+    const handleUpdate = () => setPagesVersion((v) => v + 1);
+    window.addEventListener('dsp_pages_updated', handleUpdate);
+    return () => window.removeEventListener('dsp_pages_updated', handleUpdate);
+  }, []);
+
+  const currentPage: PolicyPage | null = activeModal ? getPage(activeModal) : null;
 
   const policyContent: Record<
     Exclude<PolicyType, null>,
@@ -442,9 +453,16 @@ export const Footer: React.FC<FooterProps> = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <h3 className="text-lg font-bold text-slate-900">
-                {policyContent[activeModal].title}
-              </h3>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 font-main-heading">
+                  {currentPage ? currentPage.title : policyContent[activeModal]?.title}
+                </h3>
+                {currentPage?.lastUpdated && (
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    সর্বশেষ আপডেট: {currentPage.lastUpdated}
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setActiveModal(null)}
@@ -454,7 +472,40 @@ export const Footer: React.FC<FooterProps> = () => {
               </button>
             </div>
 
-            <div>{policyContent[activeModal].content}</div>
+            {/* Content rendering from Admin Pages Storage */}
+            {currentPage ? (
+              <div className="space-y-4 text-sm text-slate-700 leading-relaxed">
+                {currentPage.summary && (
+                  <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl text-xs text-blue-900 font-medium">
+                    {currentPage.summary}
+                  </div>
+                )}
+
+                {/* Main Content paragraphs */}
+                <div className="space-y-2.5 whitespace-pre-line text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  {currentPage.content}
+                </div>
+
+                {/* Highlights / Features if any */}
+                {currentPage.highlights && currentPage.highlights.length > 0 && (
+                  <div className="pt-2">
+                    <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+                      Key Highlights:
+                    </h5>
+                    <ul className="space-y-1.5">
+                      {currentPage.highlights.map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-xs text-slate-600">
+                          <CheckCircle className="w-3.5 h-3.5 text-[#0052FF] shrink-0 mt-0.5" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>{policyContent[activeModal]?.content}</div>
+            )}
 
             <div className="mt-6 pt-3 border-t border-slate-100 flex justify-end">
               <button

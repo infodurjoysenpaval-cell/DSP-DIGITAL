@@ -19,11 +19,13 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  ExternalLink
+  ExternalLink,
+  Star
 } from 'lucide-react';
 import { Product, VariationItem } from '../types';
 import { SHOP_INFO, PRODUCTS, CATEGORIES } from '../data/storeData';
 import { ProductCard } from './ProductCard';
+import { getVariationDimensions, findMatchingVariation } from '../utils/variationUtils';
 
 interface ProductDetailPageProps {
   product: Product;
@@ -45,19 +47,32 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   onOpenAffiliate,
 }) => {
   const [selectedVariation, setSelectedVariation] = useState<VariationItem | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<string>('');
+  const [selectedValidity, setSelectedValidity] = useState<string>('');
   const [selectedImage, setSelectedImage] = useState<string>('');
   const [quantity, setQuantity] = useState(1);
   const [copiedLink, setCopiedLink] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
+  // Extract Plan & Validity/Month options
+  const dimensions = getVariationDimensions(product);
+  const plans = dimensions.plans;
+  const validities = dimensions.validities;
+  const planLabel = dimensions.planLabel;
+  const validityLabel = dimensions.validityLabel;
+
   // Initialize variation and image when product changes
   useEffect(() => {
     if (product) {
-      const defaultVar =
-        product.variationList && product.variationList.length > 0
-          ? product.variationList.find((v) => v.isDefault) || product.variationList[0]
-          : null;
-      setSelectedVariation(defaultVar || null);
+      const dim = getVariationDimensions(product);
+      const defaultP = dim.plans[0] || '';
+      const defaultV = dim.validities[0] || '';
+
+      setSelectedPlan(defaultP);
+      setSelectedValidity(defaultV);
+
+      const matched = findMatchingVariation(product, defaultP, defaultV);
+      setSelectedVariation(matched || (product.variationList?.[0] ?? null));
       setSelectedImage(product.images?.[0] || '');
       setQuantity(1);
       setCopiedLink(false);
@@ -276,85 +291,102 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           <div className="lg:col-span-6 bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs flex flex-col justify-between">
             <div>
               {/* Product Title */}
-              <h1 className="text-2xl sm:text-3xl lg:text-[32px] font-extrabold text-[#0F172A] leading-tight tracking-tight">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#0F172A] leading-snug tracking-tight">
                 {product.name}
               </h1>
 
-              {/* Views Count */}
-              <div className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 mt-2.5 font-medium">
-                <Eye className="w-4 h-4 text-slate-400" />
-                <span>{viewsCount.toLocaleString()} views</span>
+              {/* Rating & Reviews */}
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 mt-2">
+                <div className="flex items-center gap-0.5 text-amber-400">
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                </div>
+                <span className="text-slate-400 font-normal">({product.reviewTotal || 0} reviews)</span>
               </div>
 
-              {/* Variation / Plan Selector (Matching Image) */}
-              <div className="mt-6">
-                <div className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
-                  SELECT PLAN
-                </div>
+              {/* Price Row (Matching Image) */}
+              <div className="flex items-baseline flex-wrap gap-2.5 sm:gap-3 my-4">
+                <span className="text-3xl sm:text-4xl font-black text-[#2563EB] tracking-tight">
+                  ৳ {salePrice.toLocaleString()}
+                </span>
+                {regularPrice > salePrice && (
+                  <>
+                    <span className="text-xs sm:text-sm font-semibold text-[#FF7043] bg-orange-50 border border-orange-200 px-2 py-0.5 rounded">
+                      ৳ {(regularPrice - salePrice).toLocaleString()} Off
+                    </span>
+                    <span className="text-slate-400 line-through text-base font-normal">
+                      ৳ {regularPrice.toLocaleString()}
+                    </span>
+                  </>
+                )}
+              </div>
 
-                {hasVariations ? (
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    {product.variationList!.map((v) => {
-                      const isSelected = selectedVariation?._id === v._id;
+              {/* Plan Selection Row (Matching Image) */}
+              {plans.length > 0 && (
+                <div className="my-3.5 flex items-center gap-3">
+                  <span className="text-xs sm:text-sm font-semibold text-slate-700 min-w-[55px]">
+                    {planLabel}:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {plans.map((p) => {
+                      const isSelected = selectedPlan === p;
                       return (
                         <button
-                          key={v._id}
-                          id={`plan-btn-${v._id}`}
-                          onClick={() => setSelectedVariation(v)}
-                          className={`px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all ${
+                          key={p}
+                          id={`plan-btn-${p.replace(/\s+/g, '-').toLowerCase()}`}
+                          onClick={() => {
+                            setSelectedPlan(p);
+                            const matched = findMatchingVariation(product, p, selectedValidity);
+                            if (matched) setSelectedVariation(matched);
+                          }}
+                          className={`px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all border ${
                             isSelected
-                              ? 'border-2 border-[#FF6B00] text-[#FF6B00] bg-orange-50/50 shadow-2xs'
-                              : 'border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                              ? 'border-slate-300 text-slate-800 bg-white shadow-2xs ring-1 ring-slate-300 font-semibold'
+                              : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300 hover:text-slate-800'
                           }`}
                         >
-                          {v.name}
+                          {p}
                         </button>
                       );
                     })}
                   </div>
-                ) : (
-                  <div className="inline-flex">
-                    <span className="px-5 py-2 rounded-full text-xs sm:text-sm font-semibold border-2 border-[#FF6B00] text-[#FF6B00] bg-orange-50/50">
-                      Standard Plan
-                    </span>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* Price & Stock Box (Exact Match to User Screenshot) */}
-              <div className="mt-6 rounded-2xl border border-slate-200/90 bg-slate-50/60 p-4 sm:p-5">
-                {/* Upper Price Row */}
-                <div className="flex items-baseline flex-wrap gap-2 sm:gap-3">
-                  <span className="text-3xl sm:text-4xl font-black text-[#0F172A] tracking-tight">
-                    ৳{salePrice.toLocaleString()}
+              {/* Validity / Month Selection Row (Matching Image) */}
+              {validities.length > 0 && (
+                <div className="my-3.5 flex items-center gap-3">
+                  <span className="text-xs sm:text-sm font-semibold text-slate-700 min-w-[55px]">
+                    {validityLabel}:
                   </span>
-                  {regularPrice > salePrice && (
-                    <span className="text-slate-400 line-through text-base sm:text-lg font-medium">
-                      ৳{regularPrice.toLocaleString()}
-                    </span>
-                  )}
-                  {discountPercent > 0 && (
-                    <span className="bg-[#EF4444] text-white text-xs font-black px-2.5 py-0.5 rounded-full shadow-2xs">
-                      -{discountPercent}%
-                    </span>
-                  )}
-                </div>
-
-                {/* Thin Divider */}
-                <div className="border-b border-slate-200/80 my-3.5" />
-
-                {/* Stock & Delivery Row */}
-                <div className="flex items-center justify-between flex-wrap gap-2 text-xs sm:text-sm">
-                  <div className="flex items-center gap-1.5 text-emerald-600 font-bold">
-                    <Laptop className="w-4 h-4 shrink-0" />
-                    <span>Unlimited stock</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-500 font-medium">
-                    <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span>Manual delivery within 3 hours</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {validities.map((v) => {
+                      const isSelected = selectedValidity === v;
+                      return (
+                        <button
+                          key={v}
+                          id={`validity-btn-${v.replace(/\s+/g, '-').toLowerCase()}`}
+                          onClick={() => {
+                            setSelectedValidity(v);
+                            const matched = findMatchingVariation(product, selectedPlan, v);
+                            if (matched) setSelectedVariation(matched);
+                          }}
+                          className={`px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all border ${
+                            isSelected
+                              ? 'border-slate-300 text-slate-800 bg-white shadow-2xs ring-1 ring-slate-300 font-semibold'
+                              : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300 hover:text-slate-800'
+                          }`}
+                        >
+                          {v}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Quantity Selector */}
               <div className="flex items-center justify-between mt-5 py-2 px-1">
@@ -408,10 +440,10 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   href={whatsappUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-semibold text-xs flex items-center justify-center gap-2 transition-colors"
+                  className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors shadow-xs"
                 >
-                  <MessageCircle className="w-4 h-4 text-emerald-600" />
-                  <span>Order via WhatsApp / হোয়াটসঅ্যাপে সরাসরি প্রশ্ন ও অর্ডার করুন</span>
+                  <MessageCircle className="w-4 h-4 fill-current" />
+                  <span>হোয়াটসঅ্যাপে অর্ডার করুন</span>
                 </a>
               </div>
             </div>

@@ -3,6 +3,8 @@ import { X, CheckCircle, ShieldCheck, Phone, Mail, User, FileText, ArrowLeft, Co
 import { CartItem, OrderDetails, UserProfile } from '../types';
 import { SHOP_INFO } from '../data/storeData';
 import { saveOrderToHistory } from '../utils/authStorage';
+import { saveIncompleteOrderDraft, resolveIncompleteOrder } from '../utils/incompleteOrdersStore';
+import { trackMetaEvent } from '../utils/trackingInjector';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -39,6 +41,51 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setEmail((prev) => prev || currentUser.email);
     }
   }, [currentUser, isOpen]);
+
+  // Automatically track incomplete order draft if user entered info but hasn't completed
+  useEffect(() => {
+    if (!isOpen || items.length === 0) return;
+    if (phone.trim() || customerName.trim() || currentUser) {
+      const timer = setTimeout(() => {
+        saveIncompleteOrderDraft({
+          userId: currentUser?.id,
+          customerName: customerName.trim() || currentUser?.name || 'Guest Visitor',
+          phone: phone.trim() || currentUser?.phone || '',
+          email: email.trim() || currentUser?.email || '',
+          items,
+          totalAmount: items.reduce((acc, item) => {
+            const price = item.selectedVariation ? item.selectedVariation.salePrice : (item.product.salePrice || 0);
+            return acc + price * item.quantity;
+          }, 0),
+          paymentMethod,
+          notes,
+          stage: transactionId ? 'payment_pending' : phone ? 'checkout_entered' : 'cart_abandoned',
+        });
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [customerName, phone, email, paymentMethod, transactionId, items, notes, currentUser, isOpen]);
+
+  const handleClose = () => {
+    // If closed without completing, ensure incomplete draft is preserved
+    if (items.length > 0 && (phone.trim() || customerName.trim() || currentUser)) {
+      saveIncompleteOrderDraft({
+        userId: currentUser?.id,
+        customerName: customerName.trim() || currentUser?.name || 'Guest Visitor',
+        phone: phone.trim() || currentUser?.phone || '',
+        email: email.trim() || currentUser?.email || '',
+        items,
+        totalAmount: items.reduce((acc, item) => {
+          const price = item.selectedVariation ? item.selectedVariation.salePrice : (item.product.salePrice || 0);
+          return acc + price * item.quantity;
+        }, 0),
+        paymentMethod,
+        notes,
+        stage: transactionId ? 'payment_pending' : phone ? 'checkout_entered' : 'cart_abandoned',
+      });
+    }
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -92,6 +139,27 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     // Save order in history
     saveOrderToHistory(newOrder);
 
+    // Track Meta Purchase event (Pixel + Conversions API CAPI)
+    trackMetaEvent(
+      'Purchase',
+      {
+        value: totalAmount,
+        currency: 'BDT',
+        content_name: items.map((i) => i.product.name).join(', '),
+        num_items: items.length,
+        order_id: generatedOrderId,
+      },
+      {
+        ph: phone.replace(/[^0-9]/g, ''),
+        em: email.trim().toLowerCase(),
+        fn: customerName.trim(),
+      }
+    );
+
+    // Resolve any incomplete draft for this user/phone
+    resolveIncompleteOrder(phone);
+    if (email) resolveIncompleteOrder(email);
+
     setTimeout(() => {
       setIsSubmitting(false);
       onOrderSuccess(newOrder);
@@ -109,7 +177,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
           <div className="flex items-center gap-2">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-1 text-slate-400 hover:text-slate-700 rounded-lg mr-1 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -119,7 +187,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </h2>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-colors"
           >
             <X className="w-5 h-5" />

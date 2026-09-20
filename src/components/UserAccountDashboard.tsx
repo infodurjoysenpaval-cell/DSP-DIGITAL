@@ -24,6 +24,9 @@ import {
   ArrowUpRight,
   X,
   Key,
+  Camera,
+  Upload,
+  FileText,
 } from 'lucide-react';
 import { UserProfile, OrderDetails } from '../types';
 import {
@@ -32,9 +35,11 @@ import {
   topUpWallet,
   bindUserReferrer,
   updateUserProfile,
+  updateUserAvatar,
   getWalletTransactions,
   WalletTransaction,
 } from '../utils/authStorage';
+import { saveAffiliateApplication } from '../utils/affiliateStorage';
 import { SHOP_INFO } from '../data/storeData';
 
 interface UserAccountDashboardProps {
@@ -42,6 +47,7 @@ interface UserAccountDashboardProps {
   onUserChange: (user: UserProfile | null) => void;
   onBrowseProducts: () => void;
   initialTab?: string;
+  onOpenAdmin?: () => void;
 }
 
 export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
@@ -49,6 +55,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
   onUserChange,
   onBrowseProducts,
   initialTab = 'dashboard',
+  onOpenAdmin,
 }) => {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [selectedOrder, setSelectedOrder] = useState<OrderDetails | null>(null);
@@ -91,6 +98,11 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
     channelLink: savedAffiliateApp?.channelLink || '',
     payoutMethod: savedAffiliateApp?.payoutMethod || 'bKash',
     accountNumber: savedAffiliateApp?.accountNumber || '',
+    nidNumber: savedAffiliateApp?.nidNumber || '',
+    documentUrl: savedAffiliateApp?.documentUrl || '',
+    documentName: savedAffiliateApp?.documentName || '',
+    documentType: savedAffiliateApp?.documentType || '',
+    documentSize: savedAffiliateApp?.documentSize || '',
   });
 
   const [affiliateSubmitted, setAffiliateSubmitted] = useState(!!savedAffiliateApp);
@@ -107,6 +119,42 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
   const handleAffiliateChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setAffiliateForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check size limit ~5MB
+    if (file.size > 5 * 1024 * 1024) {
+      setAffiliateMsg({ type: 'error', text: 'Document size must be less than 5MB.' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      const sizeInKb = (file.size / 1024).toFixed(0);
+      const sizeStr = file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${sizeInKb} KB`;
+      setAffiliateForm((prev) => ({
+        ...prev,
+        documentUrl: base64,
+        documentName: file.name,
+        documentType: file.type,
+        documentSize: sizeStr,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveDocument = () => {
+    setAffiliateForm((prev) => ({
+      ...prev,
+      documentUrl: '',
+      documentName: '',
+      documentType: '',
+      documentSize: '',
+    }));
   };
 
   const handleAffiliateSubmit = (e: React.FormEvent) => {
@@ -142,11 +190,30 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
       } catch (err) {
         console.error('Failed to save affiliate app', err);
       }
+
+      // Also save to shared admin applications store
+      saveAffiliateApplication({
+        userId: currentUser.id,
+        fullName: affiliateForm.fullName,
+        contactNumber: affiliateForm.contactNumber,
+        whatsappNumber: affiliateForm.whatsappNumber,
+        email: affiliateForm.email,
+        channelLink: affiliateForm.channelLink,
+        payoutMethod: affiliateForm.payoutMethod,
+        accountNumber: affiliateForm.accountNumber,
+        nidNumber: affiliateForm.nidNumber,
+        documentUrl: affiliateForm.documentUrl,
+        documentName: affiliateForm.documentName,
+        documentType: affiliateForm.documentType,
+        documentSize: affiliateForm.documentSize,
+        status: 'pending',
+      });
+
       setSubmittingAffiliate(false);
       setAffiliateSubmitted(true);
       setAffiliateMsg({
         type: 'success',
-        text: 'Your application has been submitted successfully! Our team will review and approve your application.',
+        text: 'Your application has been submitted successfully! Our admin team will review your documents and approve your account.',
       });
     }, 600);
   };
@@ -269,6 +336,21 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Left Sidebar Menu Card Matching Image */}
           <aside className="w-full lg:w-64 shrink-0 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-3 space-y-1">
+            {/* Admin Panel Quick Access (if admin) */}
+            {currentUser.role === 'admin' && (
+              <button
+                id="dash-tab-admin-panel"
+                onClick={onOpenAdmin}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-gradient-to-r from-[#0052FF] to-[#00DFBA] text-white font-bold shadow-xs hover:opacity-95 transition-all mb-2 cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-300" />
+                  <span>Admin Panel</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-cyan-200" />
+              </button>
+            )}
+
             {/* Dashboard */}
             <button
               id="dash-tab-dashboard"
@@ -1054,6 +1136,84 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                       </div>
                     </div>
 
+                    {/* Row 5: NID / ID Number */}
+                    <div className="mb-4 sm:mb-5">
+                      <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
+                        National ID (NID) / Passport / Student ID Number (পরিচয়পত্র নম্বর)
+                      </label>
+                      <input
+                        type="text"
+                        name="nidNumber"
+                        value={affiliateForm.nidNumber}
+                        onChange={handleAffiliateChange}
+                        placeholder="যেমন: 19954817293847"
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
+                      />
+                    </div>
+
+                    {/* Row 6: Document Verification Upload */}
+                    <div className="mb-6 sm:mb-8">
+                      <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-1.5">
+                        Upload ID / Verification Document (NID, পাসপোর্ট, ট্রেড লাইসেন্স বা স্টুডেন্ট আইডি কার্ডের ছবি)
+                      </label>
+                      <p className="text-[11px] text-slate-500 mb-2.5">
+                        অ্যাডমিন প্যানেলে আপনার ডকুমেন্ট যাচাই ও অ্যাপ্রুভালের জন্য পরিষ্কার ছবি বা ডকুমেন্ট আপলোড করুন (সর্বোচ্চ ৫ MB)
+                      </p>
+
+                      {affiliateForm.documentUrl ? (
+                        <div className="p-3.5 rounded-2xl border border-blue-200 bg-blue-50/50 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-12 h-12 rounded-xl bg-white border border-blue-200 overflow-hidden shrink-0 flex items-center justify-center">
+                              {affiliateForm.documentType?.includes('image') || affiliateForm.documentUrl.startsWith('data:image') ? (
+                                <img
+                                  src={affiliateForm.documentUrl}
+                                  alt="Preview"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <FileText className="w-6 h-6 text-[#0052FF]" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900 truncate">
+                                {affiliateForm.documentName || 'Verification_Document.jpg'}
+                              </p>
+                              <span className="text-[11px] text-slate-500">
+                                {affiliateForm.documentSize || 'Ready for review'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleRemoveDocument}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                            title="Remove file"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="border-2 border-dashed border-slate-200 hover:border-[#0052FF] rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50/50 hover:bg-blue-50/20 group">
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={handleDocumentUpload}
+                            className="hidden"
+                          />
+                          <div className="w-10 h-10 rounded-full bg-white shadow-2xs border border-slate-200 flex items-center justify-center text-slate-600 group-hover:text-[#0052FF] transition-colors mb-2">
+                            <Upload className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-bold text-slate-700 group-hover:text-[#0052FF]">
+                            ডকুমেন্ট বা NID কার্ডের ছবি নির্বাচন করুন
+                          </span>
+                          <span className="text-[11px] text-slate-400 mt-0.5">
+                            PNG, JPG, JPEG বা PDF (Max 5MB)
+                          </span>
+                        </label>
+                      )}
+                    </div>
+
                     {/* Submit button: matching peach/coral style in reference image */}
                     <button
                       type="submit"
@@ -1139,6 +1299,76 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                     {profileMsg}
                   </div>
                 )}
+
+                {/* Profile Photo Customization */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="relative">
+                    <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-md bg-slate-200 flex items-center justify-center">
+                      {currentUser.avatar ? (
+                        <img
+                          src={currentUser.avatar}
+                          alt={currentUser.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-tr from-[#FF6B00] to-[#FFA048] flex items-center justify-center text-white text-xl font-bold">
+                          {currentUser.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 flex-1">
+                    <div className="text-xs font-bold text-slate-800">
+                      Profile Picture (কাস্টম ছবি)
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      আপনার প্রোফাইলে যে ছবিটা আপলোড করবেন সেটি ওয়েবসাইটে এবং অ্যাকাউন্টে সেভ থাকবে।
+                    </p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs transition-colors">
+                        <Camera className="w-3.5 h-3.5 text-[#FF6B00]" />
+                        <span>ছবি আপলোড করুন</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (file.size > 2 * 1024 * 1024) {
+                              alert('ছবির সাইজ ২MB এর কম হতে হবে');
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              const base64 = reader.result as string;
+                              updateUserAvatar(currentUser.id, base64);
+                              onUserChange({ ...currentUser, avatar: base64 });
+                              setProfileMsg('প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে!');
+                              setTimeout(() => setProfileMsg(null), 2500);
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+
+                      {currentUser.avatar && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateUserAvatar(currentUser.id, '');
+                            onUserChange({ ...currentUser, avatar: undefined });
+                            setProfileMsg('প্রোফাইল ছবি সরানো হয়েছে।');
+                            setTimeout(() => setProfileMsg(null), 2500);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-[11px] font-semibold transition-colors"
+                        >
+                          ছবি মুছুন
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
                 <form onSubmit={handleProfileSave} className="space-y-4 max-w-lg">
                   <div>

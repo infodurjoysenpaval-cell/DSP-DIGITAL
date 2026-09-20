@@ -76,6 +76,25 @@ export const loginUser = (
     return { success: false, message: 'অনুগ্রহ করে পাসওয়ার্ড দিন।' };
   }
 
+  // Admin Login Support (admin@gmail.com / admin)
+  if (cleanId === 'admin@gmail.com' && cleanPass === 'admin') {
+    const adminProfile: UserProfile = {
+      id: 'usr_admin_master',
+      name: 'Admin',
+      email: 'admin@gmail.com',
+      phone: '01712792184',
+      role: 'admin',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+      walletBalance: 100000,
+      referralCode: 'ADMINVIP',
+      createdAt: '2026-08-19T00:00:00.000Z',
+    };
+    try {
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(adminProfile));
+    } catch (e) {}
+    return { success: true, message: 'অ্যাডমিন প্যানেলে স্বাগতম!', user: adminProfile };
+  }
+
   const users = getRegisteredUsers();
   const found = users.find(
     (u) =>
@@ -116,12 +135,88 @@ export const loginUser = (
   return { success: true, message: 'সফলভাবে লগইন হয়েছে!', user: profile };
 };
 
+export const loginWithGoogle = (): { success: boolean; message: string; user?: UserProfile } => {
+  const users = getRegisteredUsers();
+  let googleUser = users.find((u) => u.email.includes('google') || u.email.includes('gmail'));
+
+  if (!googleUser) {
+    const newUser: StoredUserAccount = {
+      id: `usr_google_${Date.now()}`,
+      name: 'Google User',
+      email: 'user.google@gmail.com',
+      phone: '01711223344',
+      passwordHash: 'google_oauth_auth',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+      walletBalance: 0,
+      referralCode: generateReferralCode('Google User'),
+      createdAt: new Date().toISOString(),
+    };
+    users.unshift(newUser);
+    try {
+      localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+    } catch (e) {}
+    googleUser = newUser;
+  }
+
+  const profile: UserProfile = {
+    id: googleUser.id,
+    name: googleUser.name,
+    email: googleUser.email,
+    phone: googleUser.phone,
+    avatar: googleUser.avatar,
+    walletBalance: googleUser.walletBalance ?? 0,
+    referralCode: googleUser.referralCode,
+    createdAt: googleUser.createdAt,
+  };
+
+  try {
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(profile));
+  } catch (e) {}
+
+  return { success: true, message: 'Google দিয়ে সফলভাবে সাইন ইন করা হয়েছে!', user: profile };
+};
+
+export const saveGoogleUser = (googleProfile: UserProfile): UserProfile => {
+  const users = getRegisteredUsers();
+  let existing = users.find((u) => u.email.toLowerCase() === googleProfile.email.toLowerCase());
+
+  if (!existing) {
+    const newUser: StoredUserAccount = {
+      ...googleProfile,
+      passwordHash: 'google_oauth_authenticated',
+    };
+    users.unshift(newUser);
+    try {
+      localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+    } catch (e) {}
+    existing = newUser;
+  }
+
+  const profile: UserProfile = {
+    id: existing.id,
+    name: googleProfile.name || existing.name,
+    email: existing.email,
+    phone: existing.phone,
+    avatar: googleProfile.avatar || existing.avatar,
+    walletBalance: existing.walletBalance ?? 0,
+    referralCode: existing.referralCode,
+    createdAt: existing.createdAt,
+  };
+
+  try {
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(profile));
+  } catch (e) {}
+
+  return profile;
+};
+
 export const registerUser = (
   name: string,
   email: string,
   phone: string,
   password: string,
-  referredByCode?: string
+  referredByCode?: string,
+  avatar?: string
 ): { success: boolean; message: string; user?: UserProfile } => {
   const cleanName = name.trim();
   const cleanEmail = email.trim().toLowerCase();
@@ -172,6 +267,7 @@ export const registerUser = (
     email: cleanEmail,
     phone: phoneDigits,
     passwordHash: cleanPass,
+    avatar: avatar?.trim() || undefined,
     walletBalance: 0,
     referralCode,
     referredBy: referredByCode?.trim() || undefined,
@@ -188,6 +284,7 @@ export const registerUser = (
     name: newUser.name,
     email: newUser.email,
     phone: newUser.phone,
+    avatar: newUser.avatar,
     walletBalance: newUser.walletBalance,
     referralCode: newUser.referralCode,
     referredBy: newUser.referredBy,
@@ -240,6 +337,26 @@ export const updateUserProfile = (
     return { success: true, message: 'প্রোফাইল আপডেট হয়েছে!' };
   } catch (e) {
     return { success: false, message: 'প্রোফাইল আপডেট ব্যর্থ হয়েছে।' };
+  }
+};
+
+export const updateUserAvatar = (userId: string, avatarUrl: string): boolean => {
+  try {
+    const cur = getCurrentUser();
+    if (cur) {
+      cur.avatar = avatarUrl;
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(cur));
+    }
+    const users = getRegisteredUsers();
+    const idx = users.findIndex((u) => u.id === userId || (cur?.email && u.email === cur.email));
+    if (idx !== -1) {
+      users[idx].avatar = avatarUrl;
+      localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+    }
+    window.dispatchEvent(new Event('dsp_user_updated'));
+    return true;
+  } catch (e) {
+    return false;
   }
 };
 

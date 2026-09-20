@@ -127,6 +127,7 @@ export interface UserProfile {
   name: string;
   email: string;
   phone: string;
+  role?: 'admin' | 'customer';
   avatar?: string;
   walletBalance?: number;
   referralCode?: string;
@@ -148,4 +149,52 @@ export interface OrderDetails {
   status?: 'pending' | 'delivered' | 'processing' | 'cancelled';
   licenseKey?: string;
   createdAt: string;
+}
+
+export interface AffiliateApplication {
+  id: string;
+  userId?: string;
+  fullName: string;
+  contactNumber: string;
+  whatsappNumber?: string;
+  email: string;
+  channelLink?: string;
+  payoutMethod: string;
+  accountNumber: string;
+  nidNumber?: string;
+  documentUrl?: string;
+  documentName?: string;
+  documentType?: string;
+  documentSize?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: string;
+  reviewedAt?: string;
+  notes?: string;
+}
+
+export interface IncompleteOrder {
+  id: string;
+  userId?: string;
+  customerName: string;
+  phone: string;
+  email?: string;
+  items: CartItem[];
+  totalAmount: number;
+  paymentMethod?: string;
+  notes?: string;
+  stage: 'cart_abandoned' | 'checkout_entered' | 'payment_pending';
+  lastActiveAt: string;
+  status: 'abandoned' | 'recovered' | 'contacted';
+  notesAdmin?: string;
+}
+
+export interface PolicyPage {
+  id: string;
+  key: string;
+  title: string;
+  lastUpdated: string;
+  summary?: string;
+  content: string;
+  highlights?: string[];
+  isPublished: boolean;
 }

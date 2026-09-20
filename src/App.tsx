@@ -15,13 +15,36 @@ import { UserAccountDashboard } from './components/UserAccountDashboard';
 import { CustomerReviewsStats } from './components/CustomerReviewsStats';
 import { PRODUCTS, CATEGORIES, SHOP_INFO } from './data/storeData';
 import { Product, VariationItem, CartItem, OrderDetails, UserProfile } from './types';
-import { getCurrentUser } from './utils/authStorage';
+import { getCurrentUser, logoutUser } from './utils/authStorage';
+import { getLiveProducts, syncInitialProducts } from './utils/adminStore';
+import { initTrackingScripts } from './utils/trackingInjector';
+import { AdminPanel } from './components/admin/AdminPanel';
 import { Sparkles, Zap, Flame, Shield, ArrowUpDown, Check, RefreshCw, ChevronRight, ShieldCheck, ArrowLeft } from 'lucide-react';
 
 export default function App() {
-  // Main view state ('store' or 'dashboard')
-  const [currentView, setCurrentView] = useState<'store' | 'dashboard'>('store');
+  // Main view state ('store', 'dashboard', or 'admin')
+  const [currentView, setCurrentView] = useState<'store' | 'dashboard' | 'admin'>('store');
   const [dashboardTab, setDashboardTab] = useState<string>('dashboard');
+
+  // Initialize Real Tracking (Meta Pixel, TikTok Pixel, Google Tag Manager, etc.)
+  useEffect(() => {
+    initTrackingScripts();
+  }, []);
+
+  // Live products managed by Admin Panel (changes reflect on live site)
+  const [liveProducts, setLiveProducts] = useState<Product[]>(() => {
+    syncInitialProducts(PRODUCTS);
+    return getLiveProducts();
+  });
+
+  // Listen for admin live changes
+  useEffect(() => {
+    const handleProductsChange = () => {
+      setLiveProducts(getLiveProducts());
+    };
+    window.addEventListener('dsp_products_updated', handleProductsChange);
+    return () => window.removeEventListener('dsp_products_updated', handleProductsChange);
+  }, []);
 
   // Countdown Timer for New Arrivals (Matching Image 1: 0-15 Hours, 0-52 Mins, 0-7 Sec)
   const [countdown, setCountdown] = useState({ hours: 15, mins: 52, secs: 7 });
@@ -113,11 +136,18 @@ export default function App() {
     return () => window.removeEventListener('popstate', syncProductFromUrl);
   }, []);
 
-  // Open customer account dashboard
-  const handleOpenDashboard = (tab?: string) => {
-    if (!currentUser) {
+  // Open customer account dashboard or admin panel
+  const handleOpenDashboard = (tab?: string, targetUser?: UserProfile | null) => {
+    const active = targetUser || currentUser || getCurrentUser();
+    if (!active) {
       setAuthModalMode('login');
       setIsAuthModalOpen(true);
+      return;
+    }
+    if (active.role === 'admin' || tab === 'admin') {
+      setCurrentView('admin');
+      setSelectedProduct(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     setDashboardTab(tab || 'dashboard');
@@ -215,7 +245,7 @@ export default function App() {
 
   // Filtered & Sorted Products
   const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter((prod) => {
+    return liveProducts.filter((prod) => {
       // Search filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
@@ -273,7 +303,7 @@ export default function App() {
       }
       return 0; // Default order
     });
-  }, [searchQuery, selectedCategory, activeTag, sortBy]);
+  }, [liveProducts, searchQuery, selectedCategory, activeTag, sortBy]);
 
   const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
@@ -284,18 +314,18 @@ export default function App() {
 
   // Section 1: New Arrivals (Flash sale / new arrival tags or top trending items)
   const newArrivalProducts = useMemo(() => {
-    const list = PRODUCTS.filter((p) =>
+    const list = liveProducts.filter((p) =>
       p.tags?.some((t) => {
         const n = t.name.toLowerCase();
         return n.includes('new') || n.includes('arrival') || n.includes('flash');
       })
     );
-    return list.length >= 5 ? list.slice(0, 10) : PRODUCTS.slice(0, 10);
-  }, []);
+    return list.length >= 5 ? list.slice(0, 10) : liveProducts.slice(0, 10);
+  }, [liveProducts]);
 
   // Section 2: Verified Accounts
   const verifiedAccountProducts = useMemo(() => {
-    const list = PRODUCTS.filter((p) => {
+    const list = liveProducts.filter((p) => {
       const catSlug = typeof p.category === 'object' && p.category !== null ? p.category.slug : '';
       return (
         catSlug === 'verified-accounts' ||
@@ -305,12 +335,12 @@ export default function App() {
         p.name.toLowerCase().includes('account')
       );
     });
-    return list.length >= 5 ? list.slice(0, 10) : PRODUCTS.filter((p) => (p.salePrice || 0) > 800).slice(0, 10);
-  }, []);
+    return list.length >= 5 ? list.slice(0, 10) : liveProducts.filter((p) => (p.salePrice || 0) > 800).slice(0, 10);
+  }, [liveProducts]);
 
   // Section 3: Subscriptions & AI Tools
   const subscriptionProducts = useMemo(() => {
-    const list = PRODUCTS.filter((p) => {
+    const list = liveProducts.filter((p) => {
       const catSlug = typeof p.category === 'object' && p.category !== null ? p.category.slug : '';
       return (
         catSlug === 'subscriptions' ||
@@ -323,12 +353,12 @@ export default function App() {
         p.name.toLowerCase().includes('canva')
       );
     });
-    return list.length >= 5 ? list.slice(0, 10) : PRODUCTS.slice(5, 15);
-  }, []);
+    return list.length >= 5 ? list.slice(0, 10) : liveProducts.slice(5, 15);
+  }, [liveProducts]);
 
   // Section 4: Windows Utility & VPN Security Keys
   const utilityAndVpnProducts = useMemo(() => {
-    const list = PRODUCTS.filter((p) => {
+    const list = liveProducts.filter((p) => {
       const catSlug = typeof p.category === 'object' && p.category !== null ? p.category.slug : '';
       return (
         catSlug === 'vpn-online-security' ||
@@ -340,8 +370,31 @@ export default function App() {
         p.name.toLowerCase().includes('internet download manager')
       );
     });
-    return list.length >= 5 ? list.slice(0, 10) : PRODUCTS.slice(10, 20);
-  }, []);
+    return list.length >= 5 ? list.slice(0, 10) : liveProducts.slice(10, 20);
+  }, [liveProducts]);
+
+  // If current view is Admin Panel and user is admin, render the full admin dashboard
+  if (currentView === 'admin' && currentUser?.role === 'admin') {
+    return (
+      <AdminPanel
+        currentUser={currentUser}
+        onVisitWebsite={() => {
+          setCurrentView('store');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onLogout={() => {
+          logoutUser();
+          setCurrentUser(null);
+          setCurrentView('store');
+          showToast('সফলভাবে লগআউট হয়েছে');
+        }}
+        onViewProductOnSite={(prod) => {
+          setCurrentView('store');
+          handleSelectProduct(prod);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] pb-16 md:pb-0">
@@ -400,6 +453,10 @@ export default function App() {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             initialTab={dashboardTab}
+            onOpenAdmin={() => {
+              setCurrentView('admin');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         ) : selectedProduct ? (
           <ProductDetailPage
@@ -447,13 +504,13 @@ export default function App() {
                     </h2>
                     {/* Countdown Timer Badges matching sleek digital aesthetic */}
                     <div className="flex items-center gap-1 sm:gap-1.5">
-                      <span className="bg-slate-900 text-white font-mono font-price-text text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg shadow-2xs whitespace-nowrap">
+                      <span className="bg-blue-50 text-[#0052FF] border border-blue-200/90 font-mono font-bold text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg shadow-2xs whitespace-nowrap">
                         0-{String(countdown.hours).padStart(2, '0')} Hours
                       </span>
-                      <span className="bg-slate-900 text-white font-mono font-price-text text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg shadow-2xs whitespace-nowrap">
+                      <span className="bg-blue-50 text-[#0052FF] border border-blue-200/90 font-mono font-bold text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg shadow-2xs whitespace-nowrap">
                         0-{String(countdown.mins).padStart(2, '0')} Mins
                       </span>
-                      <span className="bg-slate-900 text-white font-mono font-price-text text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg shadow-2xs whitespace-nowrap">
+                      <span className="bg-blue-50 text-[#0052FF] border border-blue-200/90 font-mono font-bold text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg shadow-2xs whitespace-nowrap">
                         0-{String(countdown.secs).padStart(2, '0')} Sec
                       </span>
                     </div>
@@ -835,10 +892,15 @@ export default function App() {
           setCurrentUser(user);
           if (user) {
             showToast(`স্বাগতম, ${user.name}!`);
+            if (user.role === 'admin') {
+              setCurrentView('admin');
+              setIsAuthModalOpen(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
           }
         }}
         initialMode={authModalMode}
-        onOpenDashboard={() => handleOpenDashboard('dashboard')}
+        onOpenDashboard={(user) => handleOpenDashboard('dashboard', user)}
       />
 
       {/* Order Success Screen */}
