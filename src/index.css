@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --font-heading: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-subheading: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-btn: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-nav: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-price: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-offer: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* User-Specified Font Hierarchy:
+   Main Heading  → Space Grotesk Bold (700)
+   Sub Heading   → Space Grotesk SemiBold (600)
+   Body Text     → Inter Regular (400)
+   Button Text   → Inter SemiBold (600)
+   Price / Offer → Manrope Bold (700)
+   Navigation    → Inter Medium (500)
+*/
+
+@layer base {
+  html, body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 400;
+  }
+
+  /* 1. Main Heading -> Space Grotesk Bold */
+  h1, .font-main-heading, .main-heading {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+  }
+
+  /* 2. Sub Heading -> Space Grotesk SemiBold */
+  h2, h3, h4, h5, h6, .font-sub-heading, .sub-heading {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+  }
+
+  /* 3. Body Text -> Inter Regular */
+  p, label, li, td, th, input, textarea, select, .font-body-text, .body-text {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+  }
+
+  /* 4. Button Text -> Inter SemiBold */
+  button, [role="button"], .btn, .btn-text, .font-btn-text {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+  }
+
+  /* 5. Price / Offer -> Manrope Bold */
+  .font-price, .font-offer, .price-text, .offer-text, .price-tag, .offer-badge {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+  }
+
+  /* 6. Navigation -> Inter Medium */
+  nav, nav a, nav button, .nav-item, .nav-link, .font-nav-text, .navigation {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+  }
+}
+
+/* Targeted Utility Classes to guarantee exact font & weight pairing */
+.font-main-heading {
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-weight: 700 !important;
+}
+
+.font-sub-heading {
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-weight: 600 !important;
+}
+
+.font-body-text {
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 400 !important;
+}
+
+.font-btn-text {
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+}
+
+.font-price-text,
+.font-offer-text,
+.font-price,
+.font-offer {
+  font-family: 'Manrope', sans-serif !important;
+  font-weight: 700 !important;
+}
+
+.font-nav-text {
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 500 !important;
+}
+

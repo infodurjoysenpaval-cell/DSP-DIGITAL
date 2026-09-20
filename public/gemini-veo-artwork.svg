@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 800" width="1000" height="800">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGlow" cx="50%" cy="48%" r="60%">
+      <stop offset="0%" stop-color="#1E293B" stop-opacity="0.8" />
+      <stop offset="45%" stop-color="#0F172A" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#020617" />
+    </radialGradient>
+
+    <!-- Star Multi-color Gradient -->
+    <linearGradient id="starGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="25%" stop-color="#06B6D4" />
+      <stop offset="50%" stop-color="#10B981" />
+      <stop offset="75%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#EF4444" />
+    </linearGradient>
+
+    <linearGradient id="starGlowInner" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.8" />
+      <stop offset="30%" stop-color="#38BDF8" stop-opacity="0.4" />
+      <stop offset="70%" stop-color="#F43F5E" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#EA580C" stop-opacity="0.6" />
+    </linearGradient>
+
+    <!-- Neon Ring Gradient -->
+    <linearGradient id="ringGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#EF4444" />
+      <stop offset="25%" stop-color="#8B5CF6" />
+      <stop offset="50%" stop-color="#3B82F6" />
+      <stop offset="75%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+
+    <radialGradient id="pedestalReflect" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.35" />
+      <stop offset="60%" stop-color="#818CF8" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Filters for Bloom/Glow -->
+    <filter id="superGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="35" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="15" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background Dark Stage -->
+  <rect width="1000" height="800" fill="url(#bgGlow)" rx="24" />
+
+  <!-- Background UI Mockup Silhouette -->
+  <g opacity="0.28">
+    <!-- Sidebar -->
+    <rect x="50" y="50" width="160" height="700" rx="16" fill="#1E293B" />
+    <circle cx="90" cy="90" r="14" fill="#3B82F6" opacity="0.8" />
+    <rect x="115" y="85" width="70" height="10" rx="5" fill="#94A3B8" />
+    
+    <rect x="70" y="135" width="120" height="28" rx="8" fill="#334155" />
+    <rect x="70" y="180" width="120" height="24" rx="6" fill="#1E293B" stroke="#334155" />
+    <rect x="70" y="215" width="120" height="24" rx="6" fill="#1E293B" stroke="#334155" />
+    <rect x="70" y="250" width="120" height="24" rx="6" fill="#1E293B" stroke="#334155" />
+
+    <!-- Top user greeting -->
+    <text x="250" y="140" fill="#94A3B8" font-family="system-ui, sans-serif" font-size="28" font-weight="600">Hello, <tspan fill="#38BDF8">User</tspan></text>
+    <text x="250" y="180" fill="#64748B" font-family="system-ui, sans-serif" font-size="16">How can I help you today?</text>
+
+    <!-- Prompt cards -->
+    <rect x="250" y="220" width="160" height="90" rx="12" fill="#1E293B" stroke="#334155" />
+    <text x="268" y="250" fill="#CBD5E1" font-size="13" font-weight="600">Generate ideas</text>
+    <text x="268" y="272" fill="#64748B" font-size="11">for a product name</text>
+
+    <rect x="430" y="220" width="160" height="90" rx="12" fill="#1E293B" stroke="#334155" />
+    <text x="448" y="250" fill="#CBD5E1" font-size="13" font-weight="600">Brainstorm</text>
+    <text x="448" y="272" fill="#64748B" font-size="11">team bonding ideas</text>
+
+    <rect x="610" y="220" width="160" height="90" rx="12" fill="#1E293B" stroke="#334155" />
+    <text x="628" y="250" fill="#CBD5E1" font-size="13" font-weight="600">Explain</text>
+    <text x="628" y="272" fill="#64748B" font-size="11">quantum computing</text>
+  </g>
+
+  <!-- Ground Reflection & Light Pool -->
+  <ellipse cx="500" cy="590" rx="340" ry="110" fill="url(#pedestalReflect)" />
+
+  <!-- Pedestal Platform -->
+  <!-- Bottom base cylinder -->
+  <ellipse cx="500" cy="610" rx="220" ry="60" fill="#0B1120" stroke="#1E293B" stroke-width="3" />
+  
+  <!-- Pedestal Body -->
+  <path d="M 280 610 L 320 540 A 180 50 0 0 1 680 540 L 720 610 A 220 60 0 0 1 280 610 Z" fill="#0F172A" opacity="0.9" />
+
+  <!-- Glowing Neon Ring around the pedestal -->
+  <ellipse cx="500" cy="540" rx="180" ry="50" fill="none" stroke="url(#ringGradient)" stroke-width="8" filter="url(#superGlow)" opacity="0.9" />
+  <ellipse cx="500" cy="540" rx="180" ry="50" fill="none" stroke="url(#ringGradient)" stroke-width="4" />
+  
+  <!-- Top Surface of Pedestal -->
+  <ellipse cx="500" cy="535" rx="170" ry="46" fill="#1E293B" stroke="#38BDF8" stroke-width="2" opacity="0.95" />
+  <ellipse cx="500" cy="535" rx="150" ry="40" fill="#0F172A" />
+
+  <!-- Ambient Glow Behind Gemini Star -->
+  <circle cx="500" cy="420" r="140" fill="#38BDF8" opacity="0.25" filter="url(#superGlow)" />
+  <circle cx="500" cy="420" r="110" fill="#F43F5E" opacity="0.2" filter="url(#superGlow)" />
+
+  <!-- 3D Pedestal Ring Highlight -->
+  <ellipse cx="500" cy="532" rx="110" ry="24" fill="#38BDF8" opacity="0.4" filter="url(#softGlow)" />
+
+  <!-- Gemini 4-Pointed Star Glowing Icon -->
+  <!-- Star Outer Glow -->
+  <path d="M 500 240 
+           C 500 340, 580 420, 680 420 
+           C 580 420, 500 500, 500 600 
+           C 500 500, 420 420, 320 420 
+           C 420 420, 500 340, 500 240 Z" 
+        fill="url(#starGradient)" 
+        filter="url(#superGlow)" 
+        opacity="0.85" />
+
+  <!-- Star Main Body -->
+  <path d="M 500 240 
+           C 500 340, 580 420, 680 420 
+           C 580 420, 500 500, 500 600 
+           C 500 500, 420 420, 320 420 
+           C 420 420, 500 340, 500 240 Z" 
+        fill="url(#starGradient)" 
+        stroke="#FFFFFF" 
+        stroke-width="3" 
+        stroke-opacity="0.6" />
+
+  <!-- Inner Shimmer & Core Highlight -->
+  <path d="M 500 280 
+           C 500 360, 550 420, 630 420 
+           C 550 420, 500 480, 500 560 
+           C 500 480, 450 420, 370 420 
+           C 450 420, 500 360, 500 280 Z" 
+        fill="url(#starGlowInner)" 
+        opacity="0.7" />
+
+  <circle cx="500" cy="420" r="16" fill="#FFFFFF" opacity="0.8" filter="url(#softGlow)" />
+
+  <!-- HOT Badge (Matching Image Top-Left) -->
+  <g transform="translate(60, 55)">
+    <rect x="0" y="0" width="84" height="34" rx="17" fill="#FF5722" filter="url(#softGlow)" />
+    <!-- Fire / Flame Icon -->
+    <path d="M 22 25 C 19 25, 17 23, 17 20 C 17 17, 19 15, 20 13 C 21 15, 23 16, 24 16 C 25 14, 25 12, 24 10 C 27 12, 30 15, 30 19 C 30 23, 27 25, 24 25 C 23 25, 22 24, 22 24 C 22 24, 22 25, 22 25 Z" fill="#FFFFFF" />
+    <text x="36" y="23" fill="#FFFFFF" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="800" letter-spacing="1">HOT</text>
+  </g>
+</svg>
