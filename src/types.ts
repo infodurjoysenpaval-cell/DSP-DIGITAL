@@ -133,6 +133,10 @@ export interface UserProfile {
   referralCode?: string;
   referredBy?: string;
   createdAt: string;
+  emailVerified?: boolean;
+  authProvider?: 'google' | 'firebase' | 'email' | 'password';
+  isAffiliate?: boolean;
+  affiliateStatus?: 'pending' | 'approved' | 'rejected' | 'restricted';
 }
 
 export interface OrderDetails {
@@ -146,9 +150,37 @@ export interface OrderDetails {
   paymentMethod: 'bkash' | 'nagad' | 'rocket' | 'bank' | 'wallet';
   transactionId?: string;
   totalAmount: number;
+  affiliateDiscount?: number;
+  referralDiscount?: number;
+  appliedReferralCode?: string;
   status?: 'pending' | 'delivered' | 'processing' | 'cancelled';
   licenseKey?: string;
   createdAt: string;
+}
+
+export interface AffiliatePayoutRequest {
+  id: string;
+  affiliateId: string;
+  amount: number;
+  payoutMethod: string;
+  accountNumber: string;
+  requestedAt: string;
+  status: 'pending' | 'paid' | 'rejected';
+  processedAt?: string;
+}
+
+export interface AffiliateSaleRecord {
+  id: string;
+  orderId: string;
+  itemsSummary: string;
+  totalAmount: number;
+  commission: number; // 15% discount amount credited
+  date: string;
+  productName?: string;
+  orderTotal?: number;
+  commissionEarned?: number;
+  status?: string;
+  createdAt?: string;
 }
 
 export interface AffiliateApplication {
@@ -166,10 +198,17 @@ export interface AffiliateApplication {
   documentName?: string;
   documentType?: string;
   documentSize?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'restricted';
   submittedAt: string;
   reviewedAt?: string;
   notes?: string;
+  referralCode?: string;
+  availableBalance?: number;
+  totalEarned?: number;
+  paidOut?: number;
+  salesCount?: number;
+  payoutRequests?: AffiliatePayoutRequest[];
+  referralSales?: AffiliateSaleRecord[];
 }
 
 export interface IncompleteOrder {

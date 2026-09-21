@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShieldCheck, Phone, Mail, User, ArrowLeft, Copy, Check, Sparkles, LogIn, ShoppingBag, Zap, Tag, Shield } from 'lucide-react';
+import { X, ShieldCheck, Phone, Mail, User, ArrowLeft, Copy, Check, Sparkles, LogIn, ShoppingBag, Zap, Tag, Shield, Gift, Wallet } from 'lucide-react';
 import { CartItem, OrderDetails, UserProfile } from '../types';
 import { SHOP_INFO } from '../data/storeData';
 import { getStoreSettings } from '../utils/adminStore';
-import { saveOrderToHistory } from '../utils/authStorage';
+import { saveOrderToHistory, deductWalletBalance } from '../utils/authStorage';
 import { saveIncompleteOrderDraft, resolveIncompleteOrder } from '../utils/incompleteOrdersStore';
 import { trackMetaEvent, trackGtmEvent } from '../utils/trackingInjector';
+import { isApprovedAffiliate, getActiveReferralCode, creditAffiliateCommission } from '../utils/affiliateStorage';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [email, setEmail] = useState(currentUser?.email || '');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'bkash' | 'nagad' | 'rocket'>('bkash');
+  const [paymentMethod, setPaymentMethod] = useState<'bkash' | 'nagad' | 'rocket' | 'wallet'>('bkash');
   const [senderPhone, setSenderPhone] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [couponCode, setCouponCode] = useState('');
@@ -124,12 +125,27 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const rawDiscount = originalTotal > subTotal ? originalTotal - subTotal : 0;
   const couponDiscountAmount = couponApplied ? Math.round((subTotal * discountPercent) / 100) : 0;
-  const totalAmount = Math.max(0, subTotal - couponDiscountAmount);
+
+  // 15% discount for approved affiliates
+  const isAffiliate = isApprovedAffiliate(currentUser);
+  const affiliateDiscount = isAffiliate ? Math.round(subTotal * 0.15) : 0;
+
+  // ৳20 referral discount if customer arrived via an affiliate's referral link
+  const activeRefCode = getActiveReferralCode();
+  const isOwnReferral = Boolean(
+    currentUser?.referralCode &&
+    activeRefCode &&
+    currentUser.referralCode.trim().toUpperCase() === activeRefCode.trim().toUpperCase()
+  );
+  const referralDiscount = (!isOwnReferral && activeRefCode && subTotal >= 20) ? 20 : 0;
+
+  const totalAmount = Math.max(0, subTotal - couponDiscountAmount - affiliateDiscount - referralDiscount);
 
   const overallDiscountPercent = originalTotal > 0 ? Math.round(((originalTotal - totalAmount) / originalTotal) * 100) : 0;
 
   const storeSettings = getStoreSettings();
-  const getProviderNumber = (method: 'bkash' | 'nagad' | 'rocket') => {
+  const getProviderNumber = (method: 'bkash' | 'nagad' | 'rocket' | 'wallet') => {
+    if (method === 'wallet') return '';
     const fallbackNumber = SHOP_INFO.whatsappNumber.replace(/[^0-9]/g, '') || '01712792184';
     if (method === 'bkash') {
       return storeSettings.paymentMethods?.bkash?.number || fallbackNumber;
@@ -193,12 +209,39 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
+    if (paymentMethod === 'wallet') {
+      if (!currentUser) {
+        setErrorMsg('Please sign in or register to pay using your wallet balance.');
+        return;
+      }
+      if ((currentUser.walletBalance || 0) < totalAmount) {
+        setErrorMsg(`Insufficient wallet balance. You have ৳${(currentUser.walletBalance || 0).toLocaleString()}, but this order requires ৳${totalAmount.toLocaleString()}. Please top up your wallet or select bKash/Nagad/Rocket.`);
+        return;
+      }
+    } else {
+      if (!transactionId.trim()) {
+        setErrorMsg('Please enter the Transaction ID (TrxID) after sending the payment.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     const generatedOrderId = `DSP-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    // If paid via wallet, deduct immediately
+    if (paymentMethod === 'wallet' && currentUser) {
+      const deductRes = deductWalletBalance(currentUser.id, totalAmount, generatedOrderId);
+      if (!deductRes.success) {
+        setErrorMsg(deductRes.message);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     const fullNotes = [
       notes.trim(),
-      senderPhone.trim() ? `Sender Number (${paymentMethod}): ${senderPhone.trim()}` : '',
+      paymentMethod === 'wallet' ? 'Paid via DSP Wallet Balance' : (senderPhone.trim() ? `Sender Number (${paymentMethod}): ${senderPhone.trim()}` : ''),
     ].filter(Boolean).join(' | ');
 
     const newOrder: OrderDetails = {
@@ -210,12 +253,27 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       notes: fullNotes,
       items,
       paymentMethod,
-      transactionId: transactionId.trim() || undefined,
+      transactionId: paymentMethod === 'wallet' ? `WALLET-${Date.now().toString().slice(-6)}` : (transactionId.trim() || undefined),
       totalAmount,
+      affiliateDiscount: affiliateDiscount > 0 ? affiliateDiscount : undefined,
+      referralDiscount: referralDiscount > 0 ? referralDiscount : undefined,
+      appliedReferralCode: referralDiscount > 0 && activeRefCode ? activeRefCode : undefined,
       createdAt: new Date().toISOString(),
     };
 
     saveOrderToHistory(newOrder);
+
+    // Credit 15% product discount value (or ৳20 minimum) to affiliate's dashboard balance
+    // upon customer ordering with their referral link
+    if (activeRefCode) {
+      const subtotal = items.reduce((acc, item) => {
+        const price = item.selectedVariation ? item.selectedVariation.salePrice : (item.product.salePrice || 0);
+        return acc + price * item.quantity;
+      }, 0);
+      const earnedCommission = Math.max(20, Math.round(subtotal * 0.15));
+      const itemsSummary = items.map((i) => `${i.product.name} (x${i.quantity})`).join(', ');
+      creditAffiliateCommission(activeRefCode, earnedCommission, generatedOrderId, itemsSummary, totalAmount);
+    }
 
     trackMetaEvent(
       'Purchase',
@@ -404,27 +462,27 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </span>
                 </div>
 
-                {/* 3 Payment Options: bKash, Nagad, Rocket */}
-                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                {/* 4 Payment Options: bKash, Nagad, Rocket, Wallet */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
                   {/* bKash */}
                   <div
                     id="payment-method-bkash"
                     onClick={() => setPaymentMethod('bkash')}
-                    className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5 ${
+                    className={`p-2.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5 ${
                       paymentMethod === 'bkash'
                         ? 'border-[#2563EB] bg-[#2563EB]/5 shadow-xs'
                         : 'border-slate-200 bg-white hover:border-slate-300'
                     }`}
                   >
-                    <div className="w-8 h-8 rounded-full bg-[#E2136E]/10 border border-[#E2136E]/20 flex items-center justify-center font-bold text-xs text-[#E2136E]">
+                    <div className="w-7 h-7 rounded-full bg-[#E2136E]/10 border border-[#E2136E]/20 flex items-center justify-center font-bold text-xs text-[#E2136E]">
                       বিকাশ
                     </div>
                     <div>
                       <span className="block text-xs font-bold text-slate-900">bKash</span>
                       <span className="text-[10px] text-slate-500 font-medium">Send Money</span>
                     </div>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 ${paymentMethod === 'bkash' ? 'border-[#2563EB]' : 'border-slate-300'}`}>
-                      {paymentMethod === 'bkash' && <div className="w-2 h-2 rounded-full bg-[#2563EB]" />}
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center mt-0.5 ${paymentMethod === 'bkash' ? 'border-[#2563EB]' : 'border-slate-300'}`}>
+                      {paymentMethod === 'bkash' && <div className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />}
                     </div>
                   </div>
 
@@ -432,21 +490,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <div
                     id="payment-method-nagad"
                     onClick={() => setPaymentMethod('nagad')}
-                    className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5 ${
+                    className={`p-2.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5 ${
                       paymentMethod === 'nagad'
                         ? 'border-[#2563EB] bg-[#2563EB]/5 shadow-xs'
                         : 'border-slate-200 bg-white hover:border-slate-300'
                     }`}
                   >
-                    <div className="w-8 h-8 rounded-full bg-[#F7941D]/10 border border-[#F7941D]/20 flex items-center justify-center font-bold text-xs text-[#F7941D]">
+                    <div className="w-7 h-7 rounded-full bg-[#F7941D]/10 border border-[#F7941D]/20 flex items-center justify-center font-bold text-xs text-[#F7941D]">
                       নগদ
                     </div>
                     <div>
                       <span className="block text-xs font-bold text-slate-900">Nagad</span>
                       <span className="text-[10px] text-slate-500 font-medium">Send Money</span>
                     </div>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 ${paymentMethod === 'nagad' ? 'border-[#2563EB]' : 'border-slate-300'}`}>
-                      {paymentMethod === 'nagad' && <div className="w-2 h-2 rounded-full bg-[#2563EB]" />}
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center mt-0.5 ${paymentMethod === 'nagad' ? 'border-[#2563EB]' : 'border-slate-300'}`}>
+                      {paymentMethod === 'nagad' && <div className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />}
                     </div>
                   </div>
 
@@ -454,96 +512,168 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <div
                     id="payment-method-rocket"
                     onClick={() => setPaymentMethod('rocket')}
-                    className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5 ${
+                    className={`p-2.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5 ${
                       paymentMethod === 'rocket'
                         ? 'border-[#2563EB] bg-[#2563EB]/5 shadow-xs'
                         : 'border-slate-200 bg-white hover:border-slate-300'
                     }`}
                   >
-                    <div className="w-8 h-8 rounded-full bg-[#8C3494]/10 border border-[#8C3494]/20 flex items-center justify-center font-bold text-xs text-[#8C3494]">
+                    <div className="w-7 h-7 rounded-full bg-[#8C3494]/10 border border-[#8C3494]/20 flex items-center justify-center font-bold text-xs text-[#8C3494]">
                       রকেট
                     </div>
                     <div>
                       <span className="block text-xs font-bold text-slate-900">Rocket</span>
                       <span className="text-[10px] text-slate-500 font-medium">Send Money</span>
                     </div>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 ${paymentMethod === 'rocket' ? 'border-[#2563EB]' : 'border-slate-300'}`}>
-                      {paymentMethod === 'rocket' && <div className="w-2 h-2 rounded-full bg-[#2563EB]" />}
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center mt-0.5 ${paymentMethod === 'rocket' ? 'border-[#2563EB]' : 'border-slate-300'}`}>
+                      {paymentMethod === 'rocket' && <div className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />}
+                    </div>
+                  </div>
+
+                  {/* Wallet Balance */}
+                  <div
+                    id="payment-method-wallet"
+                    onClick={() => setPaymentMethod('wallet')}
+                    className={`p-2.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5 relative ${
+                      paymentMethod === 'wallet'
+                        ? 'border-[#2563EB] bg-[#2563EB]/5 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-xs text-emerald-600">
+                      <Wallet className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-slate-900">Wallet</span>
+                      <span className="text-[10px] text-emerald-600 font-bold">
+                        ৳ {(currentUser?.walletBalance || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center mt-0.5 ${paymentMethod === 'wallet' ? 'border-[#2563EB]' : 'border-slate-300'}`}>
+                      {paymentMethod === 'wallet' && <div className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />}
                     </div>
                   </div>
                 </div>
 
-                {/* Manual Payment Details & Instructions Box */}
-                <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl text-xs space-y-3 mt-2">
-                  <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200/70">
-                    <div>
-                      <span className="text-[11px] text-slate-500 block">
-                        {paymentMethod === 'bkash' ? 'bKash Personal Number' : paymentMethod === 'nagad' ? 'Nagad Personal Number' : 'Rocket Personal Number'} (Send Money)
+                {/* Wallet Balance Payment Box */}
+                {paymentMethod === 'wallet' ? (
+                  <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl text-xs space-y-3 mt-2">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="w-4 h-4 text-[#2563EB]" />
+                        <span className="font-bold text-slate-800">DSP Wallet Balance (ওয়ালেট ব্যালেন্স)</span>
+                      </div>
+                      <span className="font-mono text-sm font-black text-emerald-600">
+                        ৳ {(currentUser?.walletBalance || 0).toLocaleString()}
                       </span>
-                      <span className="font-mono text-sm font-bold text-slate-900 tracking-wider">
-                        {currentPaymentNumber}
-                      </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={copyPaymentNumber}
-                      className="px-3 py-1.5 bg-white hover:bg-slate-100 text-[#2563EB] border border-[#2563EB]/30 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                    >
-                      {copiedNumber ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          <span className="text-emerald-600">Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
+                    {!currentUser ? (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center justify-between">
+                        <span>ওয়ালেট ব্যালেন্স দিয়ে পে করতে অনুগ্রহ করে আগে সাইন-ইন বা লগইন করুন।</span>
+                        <button
+                          type="button"
+                          onClick={() => onOpenAuth?.('login')}
+                          className="px-3 py-1 bg-amber-600 text-white rounded-lg font-bold hover:bg-amber-700"
+                        >
+                          লগইন
+                        </button>
+                      </div>
+                    ) : (currentUser.walletBalance || 0) < totalAmount ? (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs space-y-1">
+                        <p className="font-bold">⚠ আপনার ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই!</p>
+                        <p className="text-[11px] text-rose-700">
+                          অর্ডারের মোট মূল্য: <b>৳ {totalAmount.toLocaleString()}</b>, আপনার ব্যালেন্স: <b>৳ {(currentUser.walletBalance || 0).toLocaleString()}</b>। বাকি ৳ {(totalAmount - (currentUser.walletBalance || 0)).toLocaleString()} টাকা টপ-আপ করুন (টপআপে পাচ্ছেন ৫% বোনাস) অথবা bKash/Nagad/Rocket দিয়ে পরিশোধ করুন।
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs space-y-1">
+                        <p className="font-bold flex items-center gap-1.5 text-emerald-700">
+                          <Check className="w-4 h-4 text-emerald-600" />
+                          পর্যাপ্ত ওয়ালেট ব্যালেন্স আছে!
+                        </p>
+                        <p className="text-[11px] text-emerald-700">
+                          অর্ডার কনফার্ম করার সাথে সাথে স্বয়ংক্রিয়ভাবে আপনার ওয়ালেট থেকে <b>৳ {totalAmount.toLocaleString()}</b> কেটে নেওয়া হবে। কোনো ট্রানজেকশন আইডি লিখতে হবে না।
+                        </p>
+                        <p className="text-[10px] text-slate-500 pt-1">
+                          অর্ডারের পর অবশিষ্ট ব্যালেন্স থাকবে: ৳ {((currentUser.walletBalance || 0) - totalAmount).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  /* Manual Payment Details & Instructions Box */
+                  <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl text-xs space-y-3 mt-2">
+                    <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200/70">
+                      <div>
+                        <span className="text-[11px] text-slate-500 block">
+                          {paymentMethod === 'bkash' ? 'bKash Personal Number' : paymentMethod === 'nagad' ? 'Nagad Personal Number' : 'Rocket Personal Number'} (Send Money)
+                        </span>
+                        <span className="font-mono text-sm font-bold text-slate-900 tracking-wider">
+                          {currentPaymentNumber}
+                        </span>
+                      </div>
 
-                  <div className="bg-[#2563EB]/5 border border-[#2563EB]/15 rounded-xl p-2.5 text-[11px] text-slate-700 space-y-1">
-                    <p className="font-semibold text-slate-900">
-                      পরিশোধের নিয়মাবলী (Manual Payment Instructions):
-                    </p>
-                    <p>
-                      ১. আপনার <span className="font-bold text-[#2563EB] capitalize">{paymentMethod}</span> একাউন্ট থেকে উপরে দেওয়া নম্বরে <b>৳ {totalAmount.toLocaleString()}</b> টাকা <b>Send Money</b> করুন।
-                    </p>
-                    <p>
-                      ২. সফলভাবে টাকা পাঠানোর পর প্রাপ্ত TrxID এবং আপনার নম্বরটি নিচের বক্সে লিখুন।
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        আপনার প্রেরক নম্বর (Sender Number)
-                      </label>
-                      <input
-                        type="tel"
-                        placeholder="e.g. 017XXXXXXXX"
-                        value={senderPhone}
-                        onChange={(e) => setSenderPhone(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
-                      />
+                      <button
+                        type="button"
+                        onClick={copyPaymentNumber}
+                        className="px-3 py-1.5 bg-white hover:bg-slate-100 text-[#2563EB] border border-[#2563EB]/30 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                      >
+                        {copiedNumber ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="text-emerald-600">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
                     </div>
 
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        ট্রানজেকশন আইডি (TrxID)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 9J87AKL1"
-                        value={transactionId}
-                        onChange={(e) => setTransactionId(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono uppercase placeholder:normal-case placeholder:font-sans placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
-                      />
+                    <div className="bg-[#2563EB]/5 border border-[#2563EB]/15 rounded-xl p-2.5 text-[11px] text-slate-700 space-y-1">
+                      <p className="font-semibold text-slate-900">
+                        পরিশোধের নিয়মাবলী (Manual Payment Instructions):
+                      </p>
+                      <p>
+                        ১. আপনার <span className="font-bold text-[#2563EB] capitalize">{paymentMethod}</span> একাউন্ট থেকে উপরে দেওয়া নম্বরে <b>৳ {totalAmount.toLocaleString()}</b> টাকা <b>Send Money</b> করুন।
+                      </p>
+                      <p>
+                        ২. সফলভাবে টাকা পাঠানোর পর প্রাপ্ত TrxID এবং আপনার নম্বরটি নিচের বক্সে লিখুন।
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          আপনার প্রেরক নম্বর (Sender Number)
+                        </label>
+                        <input
+                          type="tel"
+                          placeholder="e.g. 017XXXXXXXX"
+                          value={senderPhone}
+                          onChange={(e) => setSenderPhone(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          ট্রানজেকশন আইডি (TrxID)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 9J87AKL1"
+                          value={transactionId}
+                          onChange={(e) => setTransactionId(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono uppercase placeholder:normal-case placeholder:font-sans placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Have a coupon? Section */}
@@ -577,6 +707,38 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </p>
                 )}
               </div>
+
+              {/* Discounts breakdown */}
+              {(isAffiliate || referralDiscount > 0 || couponDiscountAmount > 0) && (
+                <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                  {couponApplied && couponDiscountAmount > 0 && (
+                    <div className="flex items-center justify-between text-xs text-emerald-700 font-bold bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                      <span>Coupon Discount ({discountPercent}%):</span>
+                      <span>-Tk {couponDiscountAmount.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {isAffiliate && affiliateDiscount > 0 && (
+                    <div className="flex items-center justify-between text-xs text-[#EA580C] font-bold bg-orange-50 px-3 py-1.5 rounded-xl border border-orange-200">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-[#EA580C]" />
+                        Affiliate Partner Discount (15% Off):
+                      </span>
+                      <span>-Tk {affiliateDiscount.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {referralDiscount > 0 && activeRefCode && (
+                    <div className="flex items-center justify-between text-xs text-emerald-700 font-bold bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                      <span className="flex items-center gap-1.5">
+                        <Gift className="w-3.5 h-3.5 text-emerald-600" />
+                        Referral Discount (Ref: {activeRefCode}):
+                      </span>
+                      <span>-Tk 20</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Total Summary Row */}
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between">

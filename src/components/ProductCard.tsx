@@ -6,6 +6,7 @@ interface ProductCardProps {
   onViewProduct: (product: Product) => void;
   onAddToCart: (product: Product, variation?: VariationItem) => void;
   onQuickBuy: (product: Product, variation?: VariationItem) => void;
+  isAffiliate?: boolean;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -13,6 +14,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onViewProduct,
   onAddToCart,
   onQuickBuy,
+  isAffiliate = false,
 }) => {
   const hasVariations = product.variationList && product.variationList.length > 0;
 
@@ -21,8 +23,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     ? product.variationList?.find((v) => v.isDefault) || product.variationList![0]
     : null;
 
-  const salePrice = defaultVar ? defaultVar.salePrice : (product.salePrice || 0);
+  const baseSalePrice = defaultVar ? defaultVar.salePrice : (product.salePrice || 0);
   const regularPrice = defaultVar ? defaultVar.regularPrice : (product.regularPrice || 0);
+
+  // Normal public store price
+  const salePrice = baseSalePrice;
 
   // Discount percentage
   const discountPercent = regularPrice > salePrice && regularPrice > 0
@@ -78,7 +83,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {/* Details Container */}
       <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between bg-white">
         <div>
-          {/* Product Name (2 lines properly formatted as per reference image) */}
+          {/* Product Name */}
           <h3
             onClick={() => onViewProduct(product)}
             className="text-xs sm:text-sm font-normal text-slate-900 group-hover:text-[#2563EB] transition-colors line-clamp-2 min-h-[2.5rem] leading-snug cursor-pointer"
@@ -87,14 +92,27 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             {product.name}
           </h3>
 
-          {/* Pricing Row (Centered directly above Buy Now button) */}
-          <div className="text-center my-2.5 sm:my-3 flex items-center justify-center gap-2">
-            <span className="text-base sm:text-lg font-normal text-slate-900 tracking-tight">
-              {priceDisplay}
-            </span>
-            {regularPrice > salePrice && !hasPriceRange && (
-              <span className="text-xs sm:text-sm font-normal text-slate-400 line-through">
-                ৳ {regularPrice.toLocaleString()}
+          {/* Pricing Row */}
+          <div className="text-center my-2.5 sm:my-3 flex flex-col items-center justify-center gap-0.5">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                {priceDisplay}
+              </span>
+              {isAffiliate ? (
+                <span className="text-xs sm:text-sm font-normal text-slate-400 line-through">
+                  ৳ {baseSalePrice.toLocaleString()}
+                </span>
+              ) : (
+                regularPrice > salePrice && !hasPriceRange && (
+                  <span className="text-xs sm:text-sm font-normal text-slate-400 line-through">
+                    ৳ {regularPrice.toLocaleString()}
+                  </span>
+                )
+              )}
+            </div>
+            {isAffiliate && (
+              <span className="text-[10px] text-[#EA580C] font-semibold">
+                (১৫% অ্যাফিলিয়েট ডিসকাউন্ট অন্তর্ভুক্ত)
               </span>
             )}
           </div>
@@ -105,7 +123,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <button
             id={`buy-now-${product._id}`}
             onClick={() => onQuickBuy(product, defaultVar || undefined)}
-            className="w-full py-2.5 px-3 bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-2xs transition-all text-center"
+            className="w-full py-2.5 px-3 bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-2xs transition-all text-center cursor-pointer"
           >
             Buy Now
           </button>
@@ -113,7 +131,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <button
             id={`add-cart-${product._id}`}
             onClick={() => onAddToCart(product, defaultVar || undefined)}
-            className="w-full py-2.5 px-3 bg-[#00A3FF] hover:bg-[#008AE6] active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-2xs transition-all text-center"
+            className="w-full py-2.5 px-3 bg-[#00A3FF] hover:bg-[#008AE6] active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-2xs transition-all text-center cursor-pointer"
           >
             Add to cart
           </button>

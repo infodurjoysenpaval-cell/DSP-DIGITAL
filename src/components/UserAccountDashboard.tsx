@@ -27,6 +27,12 @@ import {
   Camera,
   Upload,
   FileText,
+  Share2,
+  AlertTriangle,
+  Sparkles,
+  TrendingUp,
+  Check,
+  Search,
 } from 'lucide-react';
 import { UserProfile, OrderDetails } from '../types';
 import {
@@ -38,9 +44,23 @@ import {
   updateUserAvatar,
   getWalletTransactions,
   WalletTransaction,
+  setUserEmailVerified,
 } from '../utils/authStorage';
-import { saveAffiliateApplication } from '../utils/affiliateStorage';
+import {
+  saveAffiliateApplication,
+  getAffiliateForUser,
+  isApprovedAffiliate,
+  requestAffiliatePayout,
+  updateAffiliateStatus,
+} from '../utils/affiliateStorage';
+import { AffiliateApplication } from '../types';
 import { SHOP_INFO } from '../data/storeData';
+import { getLiveProducts } from '../utils/adminStore';
+import {
+  performOfficialGoogleSignIn,
+  sendEmailSignInVerificationLink,
+  checkCurrentEmailVerificationStatus,
+} from '../utils/firebase';
 
 interface UserAccountDashboardProps {
   currentUser: UserProfile;
@@ -115,6 +135,130 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
         }
       : null
   );
+
+  // Active Affiliate state and payouts
+  const [affiliateData, setAffiliateData] = useState<AffiliateApplication | null>(() =>
+    getAffiliateForUser(currentUser)
+  );
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [isRequestingPayout, setIsRequestingPayout] = useState(false);
+  const [payoutMsg, setPayoutMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [affiliateLinkCopied, setAffiliateLinkCopied] = useState(false);
+
+  React.useEffect(() => {
+    const handleAffUpdate = () => {
+      setAffiliateData(getAffiliateForUser(currentUser));
+    };
+    window.addEventListener('dsp_affiliate_updated', handleAffUpdate);
+    return () => window.removeEventListener('dsp_affiliate_updated', handleAffUpdate);
+  }, [currentUser]);
+
+  const activeReferralCode =
+    affiliateData?.referralCode ||
+    currentUser.referralCode ||
+    `REF${currentUser.id.replace(/[^a-zA-Z0-9]/g, '').slice(-5).toUpperCase()}`;
+
+  const affiliateReferralLink = `${window.location.origin}/?ref=${activeReferralCode}`;
+
+  const handleCopyAffiliateLink = () => {
+    navigator.clipboard.writeText(affiliateReferralLink);
+    setAffiliateLinkCopied(true);
+    setTimeout(() => setAffiliateLinkCopied(false), 2000);
+  };
+
+  const handleShareAffiliateLink = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: 'DSP Digital Mart - Affiliate Discount',
+        text: `Use my referral link to get ৳20 discount on premium digital products!\n${affiliateReferralLink}`,
+        url: affiliateReferralLink,
+      }).catch(() => {});
+    } else {
+      handleCopyAffiliateLink();
+    }
+  };
+
+  const [copiedProductSlug, setCopiedProductSlug] = useState<string | null>(null);
+  const [affiliateProductSearch, setAffiliateProductSearch] = useState('');
+  const liveProducts = useMemo(() => getLiveProducts(), []);
+
+  const handleCopyProductLink = (productSlug: string) => {
+    const url = `${window.location.origin}/?ref=${activeReferralCode}&product=${productSlug}`;
+    navigator.clipboard.writeText(url);
+    setCopiedProductSlug(productSlug);
+    setTimeout(() => setCopiedProductSlug(null), 2000);
+  };
+
+  const handleShareProduct = (productName: string, productSlug: string) => {
+    const url = `${window.location.origin}/?ref=${activeReferralCode}&product=${productSlug}`;
+    if (navigator.share) {
+      navigator.share({
+        title: `${productName} - DSP Digital Mart`,
+        text: `Get ${productName} on DSP Digital Mart with instant delivery & discount!\n${url}`,
+        url: url,
+      }).catch(() => {});
+    } else {
+      handleCopyProductLink(productSlug);
+    }
+  };
+
+  const handleRequestPayout = () => {
+    if (!affiliateData) return;
+    setPayoutMsg(null);
+    const amt = parseFloat(payoutAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setPayoutMsg({ type: 'error', text: 'Please enter a valid payout amount.' });
+      return;
+    }
+    if (amt < 100) {
+      setPayoutMsg({ type: 'error', text: 'Minimum payout request is ৳100 (Min ৳100).' });
+      return;
+    }
+    if (amt > (affiliateData.availableBalance || 0)) {
+      setPayoutMsg({
+        type: 'error',
+        text: `Insufficient balance. Available: ৳${(affiliateData.availableBalance || 0).toLocaleString()}`,
+      });
+      return;
+    }
+
+    setIsRequestingPayout(true);
+    const res = requestAffiliatePayout(
+      affiliateData.id,
+      amt,
+      affiliateData.payoutMethod || 'bKash',
+      affiliateData.accountNumber || currentUser.phone
+    );
+    setIsRequestingPayout(false);
+    setPayoutMsg({
+      type: res.success ? 'success' : 'error',
+      text: res.message,
+    });
+    if (res.success) {
+      setPayoutAmount('');
+      setAffiliateData(getAffiliateForUser(currentUser));
+    }
+  };
+
+  const handleDemoActivateAffiliate = () => {
+    let existing = affiliateData || getAffiliateForUser(currentUser);
+    if (!existing) {
+      existing = saveAffiliateApplication({
+        userId: currentUser.id,
+        fullName: currentUser.name || 'Affiliate Partner',
+        contactNumber: currentUser.phone || '01712345678',
+        whatsappNumber: currentUser.phone || '01712345678',
+        email: currentUser.email || 'affiliate@dspdigitalmart.com',
+        channelLink: 'https://facebook.com/groups/dspaffiliate',
+        payoutMethod: 'bKash',
+        accountNumber: currentUser.phone || '01712345678',
+        nidNumber: '1998471928472',
+        status: 'approved',
+      });
+    }
+    updateAffiliateStatus(existing.id, 'approved');
+    setAffiliateData(getAffiliateForUser(currentUser));
+  };
 
   const handleAffiliateChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -317,18 +461,85 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
     onUserChange(null);
   };
 
+  // Firebase Email Verification Handlers
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
+  const [verifyStatusMsg, setVerifyStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleVerifyWithGoogle = async () => {
+    setVerifyingEmail(true);
+    setVerifyStatusMsg(null);
+    try {
+      const res = await performOfficialGoogleSignIn();
+      setVerifyingEmail(false);
+      if (res.success && res.user) {
+        onUserChange(res.user);
+        setVerifyStatusMsg({
+          type: 'success',
+          text: `Google verification successful! Account ${res.user.email} is now verified.`,
+        });
+      } else if (res.message) {
+        setVerifyStatusMsg({ type: 'error', text: res.message });
+      }
+    } catch (err: any) {
+      setVerifyingEmail(false);
+      setVerifyStatusMsg({ type: 'error', text: err?.message || 'Verification failed.' });
+    }
+  };
+
+  const handleSendVerificationEmail = async () => {
+    if (!currentUser.email) {
+      setVerifyStatusMsg({ type: 'error', text: 'No email address registered.' });
+      return;
+    }
+    setVerifyingEmail(true);
+    setVerifyStatusMsg(null);
+    try {
+      const res = await sendEmailSignInVerificationLink(currentUser.email);
+      setVerifyingEmail(false);
+      if (res.success) {
+        setVerifyStatusMsg({
+          type: 'success',
+          text: res.message,
+        });
+      } else {
+        setVerifyStatusMsg({ type: 'error', text: res.message });
+      }
+    } catch (err: any) {
+      setVerifyingEmail(false);
+      setVerifyStatusMsg({ type: 'error', text: err?.message || 'Failed to send email link.' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F8F9FB] py-6 sm:py-8">
       <div className="w-full max-w-[1360px] mx-auto px-4 sm:px-6">
         {/* Top Greeting Header Matching Reference Image */}
         {activeTab === 'dashboard' && (
-          <div className="mb-6">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight flex items-center gap-2 font-main-heading">
-              Hi, {firstName} <span className="animate-bounce">👋</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 font-body-text">
-              Welcome back to your dashboard
-            </p>
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight flex items-center gap-2 font-main-heading">
+                  Hi, {firstName} <span className="animate-bounce">👋</span>
+                </h1>
+                {currentUser.emailVerified ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Verified</span>
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleVerifyWithGoogle}
+                    disabled={verifyingEmail}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                  >
+                    <span>Unverified Email — Verify with Google</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1 font-body-text">
+                Welcome back to your dashboard
+              </p>
+            </div>
           </div>
         )}
 
@@ -459,12 +670,12 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
               onClick={() => setActiveTab('affiliate')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-all duration-150 ${
                 activeTab === 'affiliate'
-                  ? 'bg-blue-50 text-[#0052FF] font-bold shadow-2xs'
+                  ? 'bg-[#FFF0E6] text-[#EA580C] font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
               }`}
             >
               {activeTab === 'affiliate' ? (
-                <div className="w-5 h-5 rounded-full bg-[#0052FF] text-white flex items-center justify-center text-[11px] font-bold shrink-0">
+                <div className="w-5 h-5 rounded-full bg-[#EA580C] text-white flex items-center justify-center text-[10px] font-black shrink-0">
                   $
                 </div>
               ) : (
@@ -983,247 +1194,683 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
             {activeTab === 'affiliate' && (
               <div className="space-y-6">
                 {/* Header matching screenshot: Dollar Icon + Title */}
-                <div className="flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded-full border-[1.5px] border-slate-900 flex items-center justify-center text-slate-900 font-bold text-xs shrink-0">
-                    $
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-6 h-6 rounded-full border-[1.5px] border-slate-900 flex items-center justify-center text-slate-900 font-bold text-xs shrink-0">
+                      $
+                    </div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-main-heading">
+                      Affiliate Program
+                    </h1>
                   </div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-main-heading">
-                    Affiliate Program
-                  </h1>
-                </div>
 
-                {/* Main Card */}
-                <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_6px_rgba(0,0,0,0.02)] p-6 sm:p-8 md:p-10">
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                    Apply to become an affiliate
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-1 mb-6 sm:mb-8">
-                    Fill in your details — our team will review and approve your application.
-                  </p>
-
-                  {affiliateMsg && (
-                    <div
-                      className={`mb-6 p-4 rounded-xl text-xs sm:text-sm font-medium flex items-start gap-2.5 ${
-                        affiliateMsg.type === 'success'
-                          ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                          : 'bg-rose-50 border border-rose-200 text-rose-800'
+                  {/* Status Badge */}
+                  {affiliateData && (
+                    <span
+                      className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${
+                        affiliateData.status === 'approved'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : affiliateData.status === 'restricted'
+                          ? 'bg-amber-100 text-amber-800'
+                          : affiliateData.status === 'rejected'
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-blue-100 text-blue-800'
                       }`}
                     >
-                      {affiliateMsg.type === 'success' ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                      ) : (
-                        <X className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                      )}
-                      <div>{affiliateMsg.text}</div>
-                    </div>
+                      {affiliateData.status === 'approved'
+                        ? 'Approved Affiliate'
+                        : affiliateData.status === 'restricted'
+                        ? 'Account Restricted'
+                        : affiliateData.status === 'rejected'
+                        ? 'Application Rejected'
+                        : 'Under Review'}
+                    </span>
                   )}
+                </div>
 
-                  <form onSubmit={handleAffiliateSubmit}>
-                    {/* Row 1: Full name + Contact number */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-5">
+                {/* SCENARIO 1: RESTRICTED AFFILIATE */}
+                {affiliateData && affiliateData.status === 'restricted' && (
+                  <div className="p-6 rounded-3xl bg-amber-50 border border-amber-200 text-amber-900 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0" />
                       <div>
-                        <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
-                          Full name
-                        </label>
-                        <input
-                          type="text"
-                          name="fullName"
-                          value={affiliateForm.fullName}
-                          onChange={handleAffiliateChange}
-                          placeholder="Your name"
-                          required
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
-                        />
+                        <h3 className="text-base font-bold">অ্যাফিলিয়েট অ্যাকাউন্ট স্থগিত করা হয়েছে (Restricted)</h3>
+                        <p className="text-xs text-amber-700 mt-0.5">
+                          এডমিন দ্বারা আপনার অ্যাফিলিয়েট সুবিধাটি সাময়িকভাবে স্থগিত বা বাতিল করা হয়েছে। এই সময়ে আপনার ১৫% ছাড় বা রেফারেল কমিশন যুক্ত হবে না।
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-xs bg-white/70 p-3 rounded-xl border border-amber-200/60">
+                      সহায়তা পেতে আমাদের WhatsApp নাম্বারে যোগাযোগ করুন: <span className="font-bold">{SHOP_INFO.whatsappNumber}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* SCENARIO 2: APPROVED AFFILIATE (MATCHING REFERENCE SCREENSHOT) */}
+                {affiliateData && affiliateData.status === 'approved' && (
+                  <div className="space-y-5">
+                    {/* Top Bronze/Copper Card: Available to Withdraw + Request payout */}
+                    <div className="rounded-3xl bg-gradient-to-br from-[#4a2614] via-[#5c331d] to-[#3a1d0f] text-white p-6 sm:p-8 shadow-md">
+                      <div className="text-xs font-semibold tracking-wider text-[#d4a383] uppercase">
+                        AVAILABLE TO WITHDRAW
+                      </div>
+                      <div className="text-3xl sm:text-4xl font-extrabold mt-1 tracking-tight">
+                        ৳{(affiliateData.availableBalance ?? 0).toLocaleString()}
                       </div>
 
-                      <div>
-                        <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
-                          Contact number
-                        </label>
-                        <input
-                          type="text"
-                          name="contactNumber"
-                          value={affiliateForm.contactNumber}
-                          onChange={handleAffiliateChange}
-                          placeholder="01XXXXXXXXX"
-                          required
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
-                        />
+                      {/* Request Payout Row */}
+                      <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        <div className="relative flex-1">
+                          <input
+                            type="number"
+                            min="100"
+                            placeholder="Amount"
+                            value={payoutAmount}
+                            onChange={(e) => setPayoutAmount(e.target.value)}
+                            className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-[#FA5B0F]/50"
+                          />
+                        </div>
+                        <button
+                          onClick={handleRequestPayout}
+                          disabled={isRequestingPayout}
+                          className="px-6 py-3 rounded-2xl bg-[#5c331d] hover:bg-[#6e3c23] border border-white/20 text-white font-bold text-sm shadow-xs transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                        >
+                          {isRequestingPayout ? 'Processing...' : 'Request payout'}
+                        </button>
+                      </div>
+
+                      {payoutMsg && (
+                        <div
+                          className={`mt-3 text-xs p-2.5 rounded-xl ${
+                            payoutMsg.type === 'success'
+                              ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/30'
+                              : 'bg-rose-500/20 text-rose-200 border border-rose-500/30'
+                          }`}
+                        >
+                          {payoutMsg.text}
+                        </div>
+                      )}
+
+                      <div className="mt-3 text-[11px] text-[#cbb2a1]">
+                        Min ৳100 · Paid to {affiliateData.payoutMethod || 'bKash'} ({affiliateData.accountNumber || currentUser.phone || 'Account'})
                       </div>
                     </div>
 
-                    {/* Row 2: WhatsApp number + Email */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-5">
-                      <div>
-                        <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
-                          WhatsApp number
-                        </label>
+                    {/* Middle Card: 3 Columns Stats (Total earned, Paid out, Sales) */}
+                    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_6px_rgba(0,0,0,0.02)] p-6 sm:p-8">
+                      <div className="grid grid-cols-3 divide-x divide-slate-100 text-center">
+                        <div className="px-2">
+                          <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                            ৳{(affiliateData.totalEarned ?? 0).toLocaleString()}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1 font-medium">
+                            Total earned
+                          </div>
+                        </div>
+                        <div className="px-2">
+                          <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                            ৳{(affiliateData.paidOut ?? 0).toLocaleString()}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1 font-medium">
+                            Paid out
+                          </div>
+                        </div>
+                        <div className="px-2">
+                          <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                            {affiliateData.salesCount ?? 0}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1 font-medium">
+                            Sales
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Card: Affiliate Link & Codes */}
+                    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_6px_rgba(0,0,0,0.02)] p-6 sm:p-8">
+                      <div className="text-xs font-bold tracking-wider text-slate-700 uppercase mb-3">
+                        YOUR AFFILIATE LINK & CODES
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                         <input
                           type="text"
-                          name="whatsappNumber"
-                          value={affiliateForm.whatsappNumber}
-                          onChange={handleAffiliateChange}
-                          placeholder="01XXXXXXXXX"
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
+                          readOnly
+                          value={affiliateReferralLink}
+                          className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-700 select-all focus:outline-none"
                         />
+                        <button
+                          onClick={handleCopyAffiliateLink}
+                          className="px-5 py-3 rounded-xl bg-[#FA5B0F] hover:bg-[#EA4B00] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                        >
+                          {affiliateLinkCopied ? (
+                            <>
+                              <Check className="w-4 h-4" /> Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-4 h-4" /> Copy
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={handleShareAffiliateLink}
+                          className="px-4 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Share2 className="w-4 h-4" /> Share
+                        </button>
                       </div>
 
-                      <div>
-                        <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          name="email"
-                          value={affiliateForm.email}
-                          onChange={handleAffiliateChange}
-                          placeholder="you@example.com"
-                          required
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
-                        />
+                      {/* Benefits Highlight Box */}
+                      <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="p-4 rounded-2xl bg-orange-50/60 border border-orange-200/60 flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-[#EA580C] text-white flex items-center justify-center shrink-0 text-xs font-bold">
+                            15%
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-900">১৫% প্রোডাক্ট ডিসকাউন্ট ও কমিশন</h4>
+                            <p className="text-[11px] text-slate-600 mt-0.5">
+                              অ্যাফিলিয়েট হিসেবে প্রতিটি প্রোডাক্টে আপনি পাচ্ছেন ১৫% ডিসকাউন্ট। আর আপনার শেয়ার করা লিংক থেকে কেউ প্রোডাক্ট কিনলে ওই ১৫% টাকা আপনার ড্যাশবোর্ডে যোগ হবে!
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/60 flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 text-xs font-bold">
+                            ৳২০+
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-900">কাস্টমার ডিসকাউন্ট ও ইনস্ট্যান্ট ব্যালেন্স</h4>
+                            <p className="text-[11px] text-slate-600 mt-0.5">
+                              আপনার লিংক দিয়ে কোনো কাস্টমার অর্ডার করলেই সে পাবে ২০ টাকা ইনস্ট্যান্ট ছাড় এবং সেই টাকা ও ১৫% কমিশন সরাসরি আপনার ড্যাশবোর্ডে জমা হবে।
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Row 3: Page / Group / Channel link (where you'll sell) */}
-                    <div className="mb-4 sm:mb-5">
-                      <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
-                        Page / Group / Channel link (where you'll sell)
-                      </label>
-                      <input
-                        type="text"
-                        name="channelLink"
-                        value={affiliateForm.channelLink}
-                        onChange={handleAffiliateChange}
-                        placeholder="https://facebook.com/yourpage"
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
-                      />
-                    </div>
+                    {/* NEW SECTION 1: AFFILIATE EXCLUSIVE 15% PRODUCT CATALOG & SHARING */}
+                    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_6px_rgba(0,0,0,0.02)] p-6 sm:p-8 space-y-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-[#EA580C]" />
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                              অ্যাফিলিয়েট প্রোডাক্ট তালিকা ও ১৫% ডিসকাউন্ট রেট
+                            </h3>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            এখানে প্রতিটি প্রোডাক্টের জন্য আপনার ১৫% ডিসকাউন্টের রেট ও সম্ভাব্য কমিশন প্রদর্শিত হচ্ছে। প্রোডাক্ট লিংক কপি করে সোশ্যাল মিডিয়ায় শেয়ার করুন।
+                          </p>
+                        </div>
 
-                    {/* Row 4: Payout method + Account number */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-                      <div>
-                        <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
-                          Payout method
-                        </label>
-                        <div className="relative">
-                          <select
-                            name="payoutMethod"
-                            value={affiliateForm.payoutMethod}
-                            onChange={handleAffiliateChange}
-                            className="w-full appearance-none px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 bg-white focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all cursor-pointer pr-10"
-                          >
-                            <option value="bKash">bKash</option>
-                            <option value="Nagad">Nagad</option>
-                            <option value="Rocket">Rocket</option>
-                            <option value="Bank Transfer">Bank Transfer</option>
-                          </select>
-                          <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        {/* Search product filter */}
+                        <div className="relative w-full sm:w-64">
+                          <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="প্রোডাক্ট খুঁজুন..."
+                            value={affiliateProductSearch}
+                            onChange={(e) => setAffiliateProductSearch(e.target.value)}
+                            className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#EA580C] focus:bg-white transition-all"
+                          />
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
-                          Account number
-                        </label>
-                        <input
-                          type="text"
-                          name="accountNumber"
-                          value={affiliateForm.accountNumber}
-                          onChange={handleAffiliateChange}
-                          placeholder="01XXXXXXXXX"
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
-                        />
+                      {/* Products Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+                        {liveProducts
+                          .filter((p) =>
+                            !affiliateProductSearch.trim() ||
+                            p.name.toLowerCase().includes(affiliateProductSearch.toLowerCase()) ||
+                            (p.category && p.category.toLowerCase().includes(affiliateProductSearch.toLowerCase()))
+                          )
+                          .slice(0, 10)
+                          .map((prod) => {
+                            const originalPrice = prod.salePrice || 100;
+                            const affiliatePrice = Math.round(originalPrice * 0.85);
+                            const commissionAmount = Math.round(originalPrice * 0.15);
+                            const isCopied = copiedProductSlug === prod.slug;
+
+                            return (
+                              <div
+                                key={prod._id || prod.slug}
+                                className="p-3.5 rounded-2xl border border-slate-200/90 bg-white hover:border-orange-200 hover:shadow-xs transition-all flex flex-col justify-between gap-3"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <img
+                                    src={prod.images?.[0] || '/placeholder.png'}
+                                    alt={prod.name}
+                                    className="w-14 h-14 rounded-xl object-cover border border-slate-100 shrink-0 bg-slate-50"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-xs font-bold text-slate-900 truncate" title={prod.name}>
+                                      {prod.name}
+                                    </h4>
+                                    <span className="text-[10px] text-slate-500 block truncate">
+                                      {typeof prod.category === 'string' ? prod.category : prod.category?.name || 'Digital License'}
+                                    </span>
+
+                                    {/* Pricing comparison */}
+                                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                      <span className="text-[11px] text-slate-400 line-through">
+                                        ৳{originalPrice.toLocaleString()}
+                                      </span>
+                                      <span className="text-xs font-bold text-slate-900">
+                                        ৳{affiliatePrice.toLocaleString()}{' '}
+                                        <span className="text-[10px] text-[#EA580C] font-semibold">(১৫% ছাড়)</span>
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Commission info & action */}
+                                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                                  <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                                    কমিশন: +৳{commissionAmount.toLocaleString()}
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyProductLink(prod.slug)}
+                                      className="px-3 py-1.5 bg-slate-100 hover:bg-orange-50 hover:text-[#EA580C] hover:border-orange-200 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 flex items-center gap-1 transition-all cursor-pointer"
+                                    >
+                                      {isCopied ? (
+                                        <>
+                                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                          <span className="text-emerald-600">কপি হয়েছে</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy className="w-3.5 h-3.5" />
+                                          <span>লিংক কপি</span>
+                                        </>
+                                      )}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleShareProduct(prod.name, prod.slug)}
+                                      className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-slate-700 transition-colors cursor-pointer"
+                                      title="Share Product"
+                                    >
+                                      <Share2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                       </div>
                     </div>
 
-                    {/* Row 5: NID / ID Number */}
-                    <div className="mb-4 sm:mb-5">
-                      <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
-                        National ID (NID) / Passport / Student ID Number
-                      </label>
-                      <input
-                        type="text"
-                        name="nidNumber"
-                        value={affiliateForm.nidNumber}
-                        onChange={handleAffiliateChange}
-                        placeholder="e.g. 19954817293847"
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
-                      />
-                    </div>
-
-                    {/* Row 6: Document Verification Upload */}
-                    <div className="mb-6 sm:mb-8">
-                      <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-1.5">
-                        Upload ID / Verification Document (NID, Passport, Trade License or Student ID card)
-                      </label>
-                      <p className="text-[11px] text-slate-500 mb-2.5">
-                        Upload a clear photo or document for administrative verification and approval (Max 5 MB)
-                      </p>
-
-                      {affiliateForm.documentUrl ? (
-                        <div className="p-3.5 rounded-2xl border border-blue-200 bg-blue-50/50 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-12 h-12 rounded-xl bg-white border border-blue-200 overflow-hidden shrink-0 flex items-center justify-center">
-                              {affiliateForm.documentType?.includes('image') || affiliateForm.documentUrl.startsWith('data:image') ? (
-                                <img
-                                  src={affiliateForm.documentUrl}
-                                  alt="Preview"
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <FileText className="w-6 h-6 text-[#0052FF]" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-slate-900 truncate">
-                                {affiliateForm.documentName || 'Verification_Document.jpg'}
-                              </p>
-                              <span className="text-[11px] text-slate-500">
-                                {affiliateForm.documentSize || 'Ready for review'}
-                              </span>
-                            </div>
+                    {/* NEW SECTION 2: REFERRAL SALES HISTORY & COMMISSIONS */}
+                    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_6px_rgba(0,0,0,0.02)] p-6 sm:p-8 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-emerald-600" />
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                              রেফারেল সেলস ও কমিশন হিস্ট্রি
+                            </h3>
                           </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            আপনার লিংক দিয়ে বিক্রি হওয়া প্রোডাক্ট এবং ড্যাশবোর্ডে যুক্ত হওয়া কমিশন বিবরণী
+                          </p>
+                        </div>
 
-                          <button
-                            type="button"
-                            onClick={handleRemoveDocument}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
-                            title="Remove file"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
+                        <span className="text-xs font-bold px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+                          মোট সেলস: {affiliateData.salesCount || (affiliateData.referralSales ? affiliateData.referralSales.length : 0)} টি
+                        </span>
+                      </div>
+
+                      {/* Sales Records List */}
+                      {(!affiliateData.referralSales || affiliateData.referralSales.length === 0) ? (
+                        <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-2">
+                          <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto" />
+                          <p className="text-xs font-bold text-slate-700">এখনও কোনো রেফারেল সেলস হয়নি</p>
+                          <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                            আপনার রেফারেল লিংক বা প্রোডাক্ট লিংক ফেসবুক, হোয়াটসঅ্যাপ বা ইউটিউবে শেয়ার করুন। কেউ কিনলেই সাথে সাথে কমিশন ড্যাশবোর্ডে যুক্ত হবে।
+                          </p>
                         </div>
                       ) : (
-                        <label className="border-2 border-dashed border-slate-200 hover:border-[#0052FF] rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50/50 hover:bg-blue-50/20 group">
-                          <input
-                            type="file"
-                            accept="image/*,.pdf"
-                            onChange={handleDocumentUpload}
-                            className="hidden"
-                          />
-                          <div className="w-10 h-10 rounded-full bg-white shadow-2xs border border-slate-200 flex items-center justify-center text-slate-600 group-hover:text-[#0052FF] transition-colors mb-2">
-                            <Upload className="w-5 h-5" />
-                          </div>
-                          <span className="text-xs font-bold text-slate-700 group-hover:text-[#0052FF]">
-                            Select verification document or ID photo
-                          </span>
-                          <span className="text-[11px] text-slate-400 mt-0.5">
-                            PNG, JPG, JPEG or PDF (Max 5MB)
-                          </span>
-                        </label>
+                        <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl overflow-hidden">
+                          {affiliateData.referralSales.map((sale) => {
+                            const dateStr = sale.date || sale.createdAt || new Date().toISOString();
+                            const prodName = sale.productName || sale.itemsSummary || 'Digital Product Order';
+                            const orderTotalVal = sale.totalAmount ?? sale.orderTotal ?? 0;
+                            const commVal = sale.commission ?? sale.commissionEarned ?? 0;
+                            const statusVal = sale.status || 'Credited';
+
+                            return (
+                              <div
+                                key={sale.id}
+                                className="p-4 bg-white hover:bg-slate-50/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                                      #{sale.orderId}
+                                    </span>
+                                    <span className="text-[11px] text-slate-500">
+                                      {new Date(dateStr).toLocaleDateString()} at{' '}
+                                      {new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  <p className="text-slate-700 font-medium">{prodName}</p>
+                                </div>
+
+                                <div className="flex items-center sm:text-right gap-4 justify-between sm:justify-end">
+                                  <div>
+                                    <span className="text-[11px] text-slate-400 block">অর্ডারের মূল্য</span>
+                                    <span className="font-bold text-slate-700">৳{orderTotalVal.toLocaleString()}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[11px] text-slate-400 block">অর্জিত কমিশন</span>
+                                    <span className="font-bold text-emerald-600 text-sm">
+                                      +৳{commVal.toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold text-[10px] rounded-full border border-emerald-200 uppercase">
+                                    {statusVal}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
+                  </div>
+                )}
 
-                    {/* Submit button: styled with company brand blue */}
-                    <button
-                      type="submit"
-                      disabled={submittingAffiliate}
-                      className="px-7 py-3 rounded-2xl sm:rounded-full bg-[#0052FF] hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-semibold transition-all shadow-xs disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <span>{submittingAffiliate ? 'Submitting...' : 'Submit application'}</span>
-                    </button>
-                  </form>
-                </div>
+                {/* SCENARIO 3: PENDING REVIEW */}
+                {affiliateData && affiliateData.status === 'pending' && (
+                  <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_6px_rgba(0,0,0,0.02)] p-6 sm:p-8 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                          Application Under Review
+                        </h2>
+                        <p className="text-xs text-slate-500">
+                          আপনার আবেদন ও ভেরিফিকেশন ডকুমেন্ট পর্যালোচনায় রয়েছে। এডমিন অ্যাপ্রুভ করলে আপনি নিয়মিত ড্যাশবোর্ড ও লিংক দেখতে পাবেন।
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5 text-slate-700">
+                      <div><span className="font-semibold">Applicant Name:</span> {affiliateData.fullName}</div>
+                      <div><span className="font-semibold">Contact:</span> {affiliateData.contactNumber}</div>
+                      <div><span className="font-semibold">Payout Method:</span> {affiliateData.payoutMethod} ({affiliateData.accountNumber})</div>
+                      <div><span className="font-semibold">NID / ID:</span> {affiliateData.nidNumber || 'Submitted'}</div>
+                      <div><span className="font-semibold">Document:</span> {affiliateData.documentName || 'Attached Document'}</div>
+                    </div>
+
+                    {/* Quick Demo Button for Testing */}
+                    <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                      <span className="text-xs text-slate-400">টেস্ট মোড:</span>
+                      <button
+                        onClick={handleDemoActivateAffiliate}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                      >
+                        ⚡ দ্রুত সক্রিয় করুন (Demo Activation)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* SCENARIO 4: NOT APPLIED YET OR REJECTED (SHOW APPLICATION FORM) */}
+                {(!affiliateData || affiliateData.status === 'rejected') && (
+                  <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_6px_rgba(0,0,0,0.02)] p-6 sm:p-8 md:p-10">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                          Apply to become an affiliate
+                        </h2>
+                        <p className="text-xs sm:text-sm text-slate-500 mt-1 mb-6 sm:mb-8">
+                          Fill in your details — our team will review and approve your application.
+                        </p>
+                      </div>
+
+                      {/* Instant Demo Activation button */}
+                      <button
+                        type="button"
+                        onClick={handleDemoActivateAffiliate}
+                        className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 transition-colors cursor-pointer shrink-0"
+                        title="Directly activate approved affiliate dashboard for testing"
+                      >
+                        ⚡ Demo: Instant Activate
+                      </button>
+                    </div>
+
+                    {affiliateMsg && (
+                      <div
+                        className={`mb-6 p-4 rounded-xl text-xs sm:text-sm font-medium flex items-start gap-2.5 ${
+                          affiliateMsg.type === 'success'
+                            ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                            : 'bg-rose-50 border border-rose-200 text-rose-800'
+                        }`}
+                      >
+                        {affiliateMsg.type === 'success' ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <X className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        )}
+                        <div>{affiliateMsg.text}</div>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleAffiliateSubmit}>
+                      {/* Row 1: Full name + Contact number */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-5">
+                        <div>
+                          <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
+                            Full name
+                          </label>
+                          <input
+                            type="text"
+                            name="fullName"
+                            value={affiliateForm.fullName}
+                            onChange={handleAffiliateChange}
+                            placeholder="Your name"
+                            required
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
+                            Contact number
+                          </label>
+                          <input
+                            type="text"
+                            name="contactNumber"
+                            value={affiliateForm.contactNumber}
+                            onChange={handleAffiliateChange}
+                            placeholder="01XXXXXXXXX"
+                            required
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Row 2: WhatsApp number + Email */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-5">
+                        <div>
+                          <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
+                            WhatsApp number
+                          </label>
+                          <input
+                            type="text"
+                            name="whatsappNumber"
+                            value={affiliateForm.whatsappNumber}
+                            onChange={handleAffiliateChange}
+                            placeholder="01XXXXXXXXX"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
+                            Email
+                          </label>
+                          <input
+                            type="email"
+                            name="email"
+                            value={affiliateForm.email}
+                            onChange={handleAffiliateChange}
+                            placeholder="you@example.com"
+                            required
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Row 3: Page / Group / Channel link */}
+                      <div className="mb-4 sm:mb-5">
+                        <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
+                          Page / Group / Channel link (where you'll sell)
+                        </label>
+                        <input
+                          type="text"
+                          name="channelLink"
+                          value={affiliateForm.channelLink}
+                          onChange={handleAffiliateChange}
+                          placeholder="https://facebook.com/yourpage"
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
+                        />
+                      </div>
+
+                      {/* Row 4: Payout method + Account number */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+                        <div>
+                          <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
+                            Payout method
+                          </label>
+                          <div className="relative">
+                            <select
+                              name="payoutMethod"
+                              value={affiliateForm.payoutMethod}
+                              onChange={handleAffiliateChange}
+                              className="w-full appearance-none px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 bg-white focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all cursor-pointer pr-10"
+                            >
+                              <option value="bKash">bKash</option>
+                              <option value="Nagad">Nagad</option>
+                              <option value="Rocket">Rocket</option>
+                              <option value="Bank Transfer">Bank Transfer</option>
+                            </select>
+                            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
+                            Account number
+                          </label>
+                          <input
+                            type="text"
+                            name="accountNumber"
+                            value={affiliateForm.accountNumber}
+                            onChange={handleAffiliateChange}
+                            placeholder="01XXXXXXXXX"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Row 5: NID / ID Number */}
+                      <div className="mb-4 sm:mb-5">
+                        <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
+                          National ID (NID) / Passport / Student ID Number
+                        </label>
+                        <input
+                          type="text"
+                          name="nidNumber"
+                          value={affiliateForm.nidNumber}
+                          onChange={handleAffiliateChange}
+                          placeholder="e.g. 19954817293847"
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
+                        />
+                      </div>
+
+                      {/* Row 6: Document Verification Upload */}
+                      <div className="mb-6 sm:mb-8">
+                        <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-1.5">
+                          Upload ID / Verification Document (NID, Passport, Trade License or Student ID card)
+                        </label>
+                        <p className="text-[11px] text-slate-500 mb-2.5">
+                          Upload a clear photo or document for administrative verification and approval (Max 5 MB)
+                        </p>
+
+                        {affiliateForm.documentUrl ? (
+                          <div className="p-3.5 rounded-2xl border border-blue-200 bg-blue-50/50 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-12 h-12 rounded-xl bg-white border border-blue-200 overflow-hidden shrink-0 flex items-center justify-center">
+                                {affiliateForm.documentType?.includes('image') || affiliateForm.documentUrl.startsWith('data:image') ? (
+                                  <img
+                                    src={affiliateForm.documentUrl}
+                                    alt="Preview"
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <FileText className="w-6 h-6 text-[#0052FF]" />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-900 truncate">
+                                  {affiliateForm.documentName || 'Verification_Document.jpg'}
+                                </p>
+                                <span className="text-[11px] text-slate-500">
+                                  {affiliateForm.documentSize || 'Ready for review'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleRemoveDocument}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                              title="Remove file"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="border-2 border-dashed border-slate-200 hover:border-[#0052FF] rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50/50 hover:bg-blue-50/20 group">
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              onChange={handleDocumentUpload}
+                              className="hidden"
+                            />
+                            <div className="w-10 h-10 rounded-full bg-white shadow-2xs border border-slate-200 flex items-center justify-center text-slate-600 group-hover:text-[#0052FF] transition-colors mb-2">
+                              <Upload className="w-5 h-5" />
+                            </div>
+                            <span className="text-xs font-bold text-slate-700 group-hover:text-[#0052FF]">
+                              Select verification document or ID photo
+                            </span>
+                            <span className="text-[11px] text-slate-400 mt-0.5">
+                              PNG, JPG, JPEG or PDF (Max 5MB)
+                            </span>
+                          </label>
+                        )}
+                      </div>
+
+                      {/* Submit button */}
+                      <button
+                        type="submit"
+                        disabled={submittingAffiliate}
+                        className="px-7 py-3 rounded-2xl sm:rounded-full bg-[#0052FF] hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-semibold transition-all shadow-xs disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <span>{submittingAffiliate ? 'Submitting...' : 'Submit application'}</span>
+                      </button>
+                    </form>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1398,15 +2045,88 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Email Address (Permanent)
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700">
+                        Email Address (Permanent)
+                      </label>
+                      {currentUser.emailVerified ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Google / Firebase Verified</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                          <span>Unverified</span>
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="email"
                       value={currentUser.email}
                       disabled
                       className="w-full px-3.5 py-2 border border-slate-200 bg-slate-50 text-slate-500 rounded-xl text-xs sm:text-sm cursor-not-allowed"
                     />
+
+                    {/* Email Verification Action Bar */}
+                    {!currentUser.emailVerified && (
+                      <div className="mt-2.5 p-3 rounded-xl bg-amber-50/90 border border-amber-200 text-xs">
+                        <div className="font-semibold text-amber-900 mb-1 flex items-center gap-1.5">
+                          <span>Verify Your Email Address with Firebase</span>
+                        </div>
+                        <p className="text-[11px] text-amber-700 mb-2">
+                          আপনার গুগল বা জিমেইল অ্যাকাউন্টটি ভেরিফাই করতে নিচের যেকোনো একটি অপশন ব্যবহার করুন:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={handleVerifyWithGoogle}
+                            disabled={verifyingEmail}
+                            className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-800 text-xs font-bold hover:bg-slate-50 shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                              <path
+                                fill="#4285F4"
+                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                              />
+                              <path
+                                fill="#34A853"
+                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                              />
+                              <path
+                                fill="#FBBC05"
+                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                              />
+                              <path
+                                fill="#EA4335"
+                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                              />
+                            </svg>
+                            <span>Google দিয়ে ইনস্ট্যান্ট ভেরিফাই</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleSendVerificationEmail}
+                            disabled={verifyingEmail}
+                            className="px-3 py-1.5 rounded-lg bg-[#0052FF] text-white text-xs font-bold hover:bg-blue-700 shadow-2xs transition-colors cursor-pointer"
+                          >
+                            <span>মেইলে ভেরিফিকেশন লিঙ্ক পাঠান</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {verifyStatusMsg && (
+                      <div
+                        className={`mt-2 p-2.5 rounded-xl text-xs font-semibold ${
+                          verifyStatusMsg.type === 'success'
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                            : 'bg-rose-50 text-rose-800 border border-rose-200'
+                        }`}
+                      >
+                        {verifyStatusMsg.text}
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -1433,12 +2153,35 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-base font-bold text-slate-900 font-main-heading">
-              Wallet Top Up
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Send money via bKash, Nagad or Rocket to add balance to your account.
-            </p>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <Wallet className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 font-main-heading">
+                  Wallet Top Up (ব্যালেন্স রিচার্জ)
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  bKash, Nagad বা Rocket-এ সেন্ড মানি করে একাউন্টে ইনস্ট্যান্ট ব্যালেন্স যোগ করুন।
+                </p>
+              </div>
+            </div>
+
+            {/* 5% Extra Bonus Banner */}
+            <div className="mt-3 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-2xl flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold text-xs shadow-xs">
+                +৫%
+              </div>
+              <div className="text-xs">
+                <div className="font-bold text-emerald-900 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  প্রতিটি টপ-আপে পাচ্ছেন ৫% এক্সট্রা বোনাস!
+                </div>
+                <div className="text-[11px] text-emerald-700 mt-0.5">
+                  যেমন: ১০০ টাকা রিচার্জ করলে ওয়ালেটে পাবেন ১০৫ টাকা, ৫০০ টাকায় পাবেন ৫২৫ টাকা!
+                </div>
+              </div>
+            </div>
 
             {topUpMsg && (
               <div
@@ -1505,6 +2248,23 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   required
                   className="w-full mt-2 px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#0052FF]"
                 />
+
+                {/* Live Bonus Calculator */}
+                {parseFloat(topUpAmount) > 0 && (
+                  <div className="mt-2 p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] text-emerald-800">
+                        রিচার্জ: ৳{parseFloat(topUpAmount) || 0} + ৫% বোনাস (+৳{Math.round((parseFloat(topUpAmount) || 0) * 0.05)})
+                      </span>
+                      <span className="block font-bold text-emerald-900 text-xs">
+                        মোট ওয়ালেটে জমা হবে: ৳{Math.round((parseFloat(topUpAmount) || 0) * 1.05)}
+                      </span>
+                    </div>
+                    <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      +৫% এক্সট্রা
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Merchant / Personal Number */}
@@ -1537,7 +2297,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                 type="submit"
                 className="w-full py-2.5 bg-[#0052FF] hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-colors"
               >
-                Confirm Top Up (৳{topUpAmount})
+                Confirm Top Up (জমা হবে ৳{Math.round((parseFloat(topUpAmount) || 0) * 1.05)})
               </button>
             </form>
           </div>

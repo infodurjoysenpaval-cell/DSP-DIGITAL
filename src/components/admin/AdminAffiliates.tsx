@@ -13,11 +13,15 @@ import {
   ShieldCheck,
   Check,
   X,
-  Download,
   AlertCircle,
   CreditCard,
   MessageSquare,
-  ZoomIn,
+  ShieldAlert,
+  Ban,
+  TrendingUp,
+  Copy,
+  DollarSign,
+  AlertTriangle,
 } from 'lucide-react';
 import { AffiliateApplication } from '../../types';
 import {
@@ -31,10 +35,11 @@ export const AdminAffiliates: React.FC = () => {
     getAffiliateApplications()
   );
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'pending' | 'approved' | 'restricted' | 'rejected'
+  >('all');
   const [selectedAppForDoc, setSelectedAppForDoc] = useState<AffiliateApplication | null>(null);
-  const [adminNoteInput, setAdminNoteInput] = useState('');
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const reload = () => {
     setApplications(getAffiliateApplications());
@@ -57,7 +62,8 @@ export const AdminAffiliates: React.FC = () => {
         (app.whatsappNumber && app.whatsappNumber.includes(q)) ||
         app.email.toLowerCase().includes(q) ||
         (app.nidNumber && app.nidNumber.includes(q)) ||
-        (app.accountNumber && app.accountNumber.includes(q))
+        (app.accountNumber && app.accountNumber.includes(q)) ||
+        (app.referralCode && app.referralCode.toLowerCase().includes(q))
       );
     });
   }, [applications, statusFilter, searchQuery]);
@@ -66,11 +72,15 @@ export const AdminAffiliates: React.FC = () => {
     const total = applications.length;
     const pending = applications.filter((a) => a.status === 'pending').length;
     const approved = applications.filter((a) => a.status === 'approved').length;
+    const restricted = applications.filter((a) => a.status === 'restricted').length;
     const rejected = applications.filter((a) => a.status === 'rejected').length;
-    return { total, pending, approved, rejected };
+    return { total, pending, approved, restricted, rejected };
   }, [applications]);
 
-  const handleStatusChange = (id: string, newStatus: 'approved' | 'rejected' | 'pending') => {
+  const handleStatusChange = (
+    id: string,
+    newStatus: 'approved' | 'restricted' | 'rejected' | 'pending'
+  ) => {
     updateAffiliateStatus(id, newStatus);
     reload();
     if (selectedAppForDoc && selectedAppForDoc.id === id) {
@@ -78,10 +88,11 @@ export const AdminAffiliates: React.FC = () => {
     }
   };
 
-  const handleSaveNote = (id: string) => {
-    updateAffiliateStatus(id, selectedAppForDoc?.status || 'pending', adminNoteInput);
-    setEditingNoteId(null);
-    reload();
+  const copyRefLink = (code: string) => {
+    const link = `${window.location.origin}/?ref=${code}`;
+    navigator.clipboard.writeText(link);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(null), 2000);
   };
 
   return (
@@ -94,7 +105,7 @@ export const AdminAffiliates: React.FC = () => {
             <span>Affiliate Partners & Verification</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            ইউজারদের জমা দেওয়া NID, ট্রেড লাইসেন্স ও অন্যান্য ডকুমেন্ট পর্যালোচনা ও অনুমোদন করুন
+            অ্যাফিলিয়েট অনুমোদন করুন, যেকোনো সময় স্থগিত (Restrict) বা বাতিল করুন, এবং রেফারেল পারফরম্যান্স দেখুন
           </p>
         </div>
 
@@ -102,7 +113,7 @@ export const AdminAffiliates: React.FC = () => {
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by Name, Phone, NID..."
+            placeholder="Search by Name, Phone, Ref Code..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#0052FF]"
@@ -111,7 +122,7 @@ export const AdminAffiliates: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
           <span className="text-xs font-semibold text-slate-500">মোট আবেদন</span>
           <div className="text-2xl font-black text-slate-900 mt-1">{stats.total}</div>
@@ -125,15 +136,21 @@ export const AdminAffiliates: React.FC = () => {
         </div>
 
         <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/60 shadow-2xs">
-          <span className="text-xs font-semibold text-emerald-700">অনুমোদিত পার্টনার</span>
+          <span className="text-xs font-semibold text-emerald-700">অনুমোদিত (Approved)</span>
           <div className="text-2xl font-black text-emerald-900 mt-1">{stats.approved}</div>
-          <span className="text-[11px] text-emerald-600">Active Affiliates</span>
+          <span className="text-[11px] text-emerald-600">১৫% ডিসকাউন্ট ও রেফারে ২০৳</span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-orange-50/60 border border-orange-200/60 shadow-2xs">
+          <span className="text-xs font-semibold text-orange-700">স্থগিত (Restricted)</span>
+          <div className="text-2xl font-black text-orange-900 mt-1">{stats.restricted}</div>
+          <span className="text-[11px] text-orange-600">সুবিধা স্থগিত রয়েছে</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-rose-50/50 border border-rose-200/60 shadow-2xs">
-          <span className="text-xs font-semibold text-rose-700">বাতিলকৃত</span>
+          <span className="text-xs font-semibold text-rose-700">বাতিলকৃত (Cancelled)</span>
           <div className="text-2xl font-black text-rose-900 mt-1">{stats.rejected}</div>
-          <span className="text-[11px] text-rose-600">Rejected Applications</span>
+          <span className="text-[11px] text-rose-600">Rejected / Cancelled</span>
         </div>
       </div>
 
@@ -142,8 +159,9 @@ export const AdminAffiliates: React.FC = () => {
         {[
           { id: 'all', label: `All (${applications.length})` },
           { id: 'pending', label: `Pending Review (${stats.pending})` },
-          { id: 'approved', label: `Approved (${stats.approved})` },
-          { id: 'rejected', label: `Rejected (${stats.rejected})` },
+          { id: 'approved', label: `Approved Active (${stats.approved})` },
+          { id: 'restricted', label: `Restricted (${stats.restricted})` },
+          { id: 'rejected', label: `Cancelled/Rejected (${stats.rejected})` },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -175,11 +193,12 @@ export const AdminAffiliates: React.FC = () => {
               <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
                 <tr>
                   <th className="px-4 py-3.5">Applicant & Contact</th>
-                  <th className="px-4 py-3.5">Channel / Page</th>
-                  <th className="px-4 py-3.5">Payout Method</th>
-                  <th className="px-4 py-3.5">Submitted Document</th>
+                  <th className="px-4 py-3.5">Referral Code & Link</th>
+                  <th className="px-4 py-3.5">Earnings & Sales</th>
+                  <th className="px-4 py-3.5">Payout Details</th>
+                  <th className="px-4 py-3.5">Verification Doc</th>
                   <th className="px-4 py-3.5">Status</th>
-                  <th className="px-4 py-3.5 text-right">Actions</th>
+                  <th className="px-4 py-3.5 text-right">Admin Controls</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -187,7 +206,14 @@ export const AdminAffiliates: React.FC = () => {
                   <tr key={app.id} className="hover:bg-slate-50/70 transition-colors">
                     {/* Applicant & Contact */}
                     <td className="px-4 py-4">
-                      <div className="font-bold text-slate-900 text-sm">{app.fullName}</div>
+                      <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                        <span>{app.fullName}</span>
+                        {app.status === 'approved' && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-[#0052FF] text-[10px] font-bold">
+                            15% Off Active
+                          </span>
+                        )}
+                      </div>
                       <div className="flex flex-col gap-0.5 mt-1 text-[11px] text-slate-500">
                         <span className="flex items-center gap-1.5 font-medium text-slate-700">
                           <Phone className="w-3 h-3 text-slate-400" />
@@ -197,30 +223,54 @@ export const AdminAffiliates: React.FC = () => {
                           <Mail className="w-3 h-3 text-slate-400" />
                           {app.email}
                         </span>
-                        {app.nidNumber && (
-                          <span className="text-[10px] text-slate-400">NID: {app.nidNumber}</span>
+                        {app.channelLink && (
+                          <a
+                            href={app.channelLink.startsWith('http') ? app.channelLink : `https://${app.channelLink}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[#0052FF] hover:underline font-medium truncate max-w-[180px] mt-0.5"
+                          >
+                            <span className="truncate">{app.channelLink}</span>
+                            <ExternalLink className="w-3 h-3 shrink-0" />
+                          </a>
                         )}
                       </div>
                     </td>
 
-                    {/* Channel / Page */}
-                    <td className="px-4 py-4 max-w-[200px]">
-                      {app.channelLink ? (
-                        <a
-                          href={app.channelLink.startsWith('http') ? app.channelLink : `https://${app.channelLink}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[#0052FF] hover:underline font-medium truncate max-w-[180px]"
-                        >
-                          <span className="truncate">{app.channelLink}</span>
-                          <ExternalLink className="w-3 h-3 shrink-0" />
-                        </a>
+                    {/* Referral Code & Link */}
+                    <td className="px-4 py-4">
+                      {app.referralCode ? (
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 font-mono font-bold text-slate-800 text-[11px]">
+                            <span>{app.referralCode}</span>
+                          </div>
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => copyRefLink(app.referralCode!)}
+                              className="inline-flex items-center gap-1 text-[11px] text-[#0052FF] hover:underline font-medium cursor-pointer"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>{copiedCode === app.referralCode ? 'Copied Link!' : 'Copy Link (?ref=...)'}</span>
+                            </button>
+                          </div>
+                        </div>
                       ) : (
-                        <span className="text-slate-400 italic">Not provided</span>
+                        <span className="text-slate-400 italic">Not generated</span>
                       )}
                     </td>
 
-                    {/* Payout Method */}
+                    {/* Earnings & Sales */}
+                    <td className="px-4 py-4">
+                      <div className="font-bold text-slate-900 text-sm">
+                        ৳{(app.availableBalance ?? 0).toLocaleString()}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Total: ৳{(app.totalEarned ?? 0).toLocaleString()} · Sales: {app.salesCount ?? 0}
+                      </div>
+                    </td>
+
+                    {/* Payout Details */}
                     <td className="px-4 py-4">
                       <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 font-bold text-slate-800 text-[11px]">
                         <CreditCard className="w-3 h-3 text-[#0052FF]" />
@@ -245,9 +295,9 @@ export const AdminAffiliates: React.FC = () => {
                       ) : (
                         <span className="text-slate-400 text-[11px] italic">কোনো ফাইল দেয়নি</span>
                       )}
-                      {app.documentName && (
+                      {app.nidNumber && (
                         <div className="text-[10px] text-slate-400 truncate max-w-[140px] mt-1">
-                          {app.documentName}
+                          NID: {app.nidNumber}
                         </div>
                       )}
                     </td>
@@ -257,7 +307,13 @@ export const AdminAffiliates: React.FC = () => {
                       {app.status === 'approved' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
                           <CheckCircle className="w-3 h-3" />
-                          Approved
+                          অনুমোদিত (Approved)
+                        </span>
+                      )}
+                      {app.status === 'restricted' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 text-[11px] font-bold border border-orange-200">
+                          <AlertTriangle className="w-3 h-3" />
+                          স্থগিত (Restricted)
                         </span>
                       )}
                       {app.status === 'pending' && (
@@ -269,7 +325,7 @@ export const AdminAffiliates: React.FC = () => {
                       {app.status === 'rejected' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-bold border border-rose-200">
                           <XCircle className="w-3 h-3" />
-                          Rejected
+                          বাতিল (Cancelled)
                         </span>
                       )}
                       <div className="text-[10px] text-slate-400 mt-1">
@@ -281,7 +337,7 @@ export const AdminAffiliates: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Actions */}
+                    {/* Admin Action Buttons */}
                     <td className="px-4 py-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         {app.whatsappNumber && (
@@ -296,25 +352,42 @@ export const AdminAffiliates: React.FC = () => {
                           </a>
                         )}
 
+                        {/* Approve Button (if not already approved) */}
                         {app.status !== 'approved' && (
                           <button
                             type="button"
                             onClick={() => handleStatusChange(app.id, 'approved')}
-                            className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-colors"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-2xs cursor-pointer"
                             title="অনুমোদন করুন (Approve)"
                           >
-                            <Check className="w-4 h-4" />
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Approve</span>
                           </button>
                         )}
 
+                        {/* Restrict Button (can restrict approved or pending affiliates) */}
+                        {app.status === 'approved' && (
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(app.id, 'restricted')}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-bold text-xs transition-colors cursor-pointer"
+                            title="স্থগিত করুন (Restrict Affiliate)"
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
+                            <span>Restrict</span>
+                          </button>
+                        )}
+
+                        {/* Reject / Cancel Button (can cancel approved or restricted affiliates) */}
                         {app.status !== 'rejected' && (
                           <button
                             type="button"
                             onClick={() => handleStatusChange(app.id, 'rejected')}
-                            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors"
-                            title="বাতিল করুন (Reject)"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-xs transition-colors cursor-pointer"
+                            title="বাতিল করুন (Cancel/Reject Affiliate)"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Cancel</span>
                           </button>
                         )}
                       </div>
@@ -350,7 +423,7 @@ export const AdminAffiliates: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedAppForDoc(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -383,9 +456,9 @@ export const AdminAffiliates: React.FC = () => {
                 </span>
               </div>
               <div>
-                <span className="text-[11px] text-slate-400 block">আবেদনের তারিখ:</span>
-                <span className="text-slate-600">
-                  {new Date(selectedAppForDoc.submittedAt).toLocaleString('bn-BD')}
+                <span className="text-[11px] text-slate-400 block">ব্যালেন্স ও সেলস:</span>
+                <span className="font-bold text-emerald-700">
+                  ৳{(selectedAppForDoc.availableBalance ?? 0).toLocaleString()} ({selectedAppForDoc.salesCount ?? 0} Sales)
                 </span>
               </div>
             </div>
@@ -432,9 +505,11 @@ export const AdminAffiliates: React.FC = () => {
               </label>
               <input
                 type="text"
-                placeholder="যেমন: ভেরিফাইড ফেসবুক পেজ, ১০% কমিশন অনুমোদিত..."
+                placeholder="যেমন: ভেরিফাইড ফেসবুক পেজ, ১৫% ডিসকাউন্ট এবং ২০৳ কমিশন সক্রিয়..."
                 defaultValue={selectedAppForDoc.notes || ''}
-                onBlur={(e) => updateAffiliateStatus(selectedAppForDoc.id, selectedAppForDoc.status, e.target.value)}
+                onBlur={(e) =>
+                  updateAffiliateStatus(selectedAppForDoc.id, selectedAppForDoc.status, e.target.value)
+                }
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0052FF]"
               />
             </div>
@@ -447,6 +522,8 @@ export const AdminAffiliates: React.FC = () => {
                   className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
                     selectedAppForDoc.status === 'approved'
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : selectedAppForDoc.status === 'restricted'
+                      ? 'bg-orange-50 text-orange-700 border border-orange-200'
                       : selectedAppForDoc.status === 'rejected'
                       ? 'bg-rose-50 text-rose-700 border border-rose-200'
                       : 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -457,22 +534,36 @@ export const AdminAffiliates: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Restrict action */}
+                {selectedAppForDoc.status === 'approved' && (
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange(selectedAppForDoc.id, 'restricted')}
+                    className="px-3.5 py-2 rounded-xl border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    স্থগিত করুন (Restrict)
+                  </button>
+                )}
+
+                {/* Reject / Cancel action */}
                 {selectedAppForDoc.status !== 'rejected' && (
                   <button
                     type="button"
                     onClick={() => handleStatusChange(selectedAppForDoc.id, 'rejected')}
-                    className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors"
+                    className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors cursor-pointer"
                   >
-                    Reject Application
+                    বাতিল করুন (Cancel)
                   </button>
                 )}
+
+                {/* Approve action */}
                 {selectedAppForDoc.status !== 'approved' && (
                   <button
                     type="button"
                     onClick={() => handleStatusChange(selectedAppForDoc.id, 'approved')}
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-xs"
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
                   >
-                    Approve & Activate Affiliate
+                    অনুমোদন করুন (Approve)
                   </button>
                 )}
               </div>

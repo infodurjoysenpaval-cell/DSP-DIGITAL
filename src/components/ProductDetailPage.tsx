@@ -35,6 +35,7 @@ interface ProductDetailPageProps {
   onAddToCart: (product: Product, variation?: VariationItem, quantity?: number) => void;
   onBuyNow: (product: Product, variation?: VariationItem, quantity?: number) => void;
   onOpenAffiliate?: () => void;
+  isAffiliate?: boolean;
 }
 
 export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
@@ -45,6 +46,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   onAddToCart,
   onBuyNow,
   onOpenAffiliate,
+  isAffiliate = false,
 }) => {
   const [selectedVariation, setSelectedVariation] = useState<VariationItem | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string>('');

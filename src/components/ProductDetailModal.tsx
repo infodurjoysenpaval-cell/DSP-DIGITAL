@@ -10,6 +10,7 @@ interface ProductDetailModalProps {
   onClose: () => void;
   onAddToCart: (product: Product, variation?: VariationItem, quantity?: number) => void;
   onBuyNow: (product: Product, variation?: VariationItem, quantity?: number) => void;
+  isAffiliate?: boolean;
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
@@ -17,6 +18,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onClose,
   onAddToCart,
   onBuyNow,
+  isAffiliate = false,
 }) => {
   const [selectedVariation, setSelectedVariation] = useState<VariationItem | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string>('');
@@ -76,8 +78,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const planLabel = dimensions.planLabel;
   const validityLabel = dimensions.validityLabel;
 
-  const salePrice = selectedVariation ? selectedVariation.salePrice : (product.salePrice || 0);
+  const baseSalePrice = selectedVariation ? selectedVariation.salePrice : (product.salePrice || 0);
   const regularPrice = selectedVariation ? selectedVariation.regularPrice : (product.regularPrice || 0);
+  const salePrice = isAffiliate ? Math.round(baseSalePrice * 0.85) : baseSalePrice;
   const discountPercent = regularPrice > salePrice && regularPrice > 0
     ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
     : 0;
@@ -201,15 +204,26 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <span className="text-2xl sm:text-3xl font-black text-[#2563EB]">
                     ৳ {salePrice.toLocaleString()}
                   </span>
-                  {regularPrice > salePrice && (
-                    <>
-                      <span className="text-xs font-semibold text-[#FF7043] bg-orange-50 border border-orange-200 px-2 py-0.5 rounded">
-                        ৳ {(regularPrice - salePrice).toLocaleString()} Off
-                      </span>
-                      <span className="text-sm font-normal text-slate-400 line-through">
-                        ৳ {regularPrice.toLocaleString()}
-                      </span>
-                    </>
+                  {isAffiliate && (
+                    <span className="text-xs font-bold text-white bg-[#EA580C] px-2.5 py-1 rounded-full shadow-xs">
+                      15% Affiliate Price
+                    </span>
+                  )}
+                  {isAffiliate ? (
+                    <span className="text-sm font-normal text-slate-400 line-through">
+                      ৳ {baseSalePrice.toLocaleString()}
+                    </span>
+                  ) : (
+                    regularPrice > salePrice && (
+                      <>
+                        <span className="text-xs font-semibold text-[#FF7043] bg-orange-50 border border-orange-200 px-2 py-0.5 rounded">
+                          ৳ {(regularPrice - salePrice).toLocaleString()} Off
+                        </span>
+                        <span className="text-sm font-normal text-slate-400 line-through">
+                          ৳ {regularPrice.toLocaleString()}
+                        </span>
+                      </>
+                    )
                   )}
                 </div>
 

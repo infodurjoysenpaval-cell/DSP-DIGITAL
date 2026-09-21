@@ -139,44 +139,11 @@ export const loginUser = (
 };
 
 export const loginWithGoogle = (): { success: boolean; message: string; user?: UserProfile } => {
-  const users = getRegisteredUsers();
-  let googleUser = users.find((u) => u.email.includes('google') || u.email.includes('gmail'));
-
-  if (!googleUser) {
-    const newUser: StoredUserAccount = {
-      id: `usr_google_${Date.now()}`,
-      name: 'Google User',
-      email: 'user.google@gmail.com',
-      phone: '01711223344',
-      passwordHash: 'google_oauth_auth',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
-      walletBalance: 0,
-      referralCode: generateReferralCode('Google User'),
-      createdAt: new Date().toISOString(),
-    };
-    users.unshift(newUser);
-    try {
-      localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
-    } catch (e) {}
-    googleUser = newUser;
+  const current = getCurrentUser();
+  if (current) {
+    return { success: true, message: 'Already signed in', user: current };
   }
-
-  const profile: UserProfile = {
-    id: googleUser.id,
-    name: googleUser.name,
-    email: googleUser.email,
-    phone: googleUser.phone,
-    avatar: googleUser.avatar,
-    walletBalance: googleUser.walletBalance ?? 0,
-    referralCode: googleUser.referralCode,
-    createdAt: googleUser.createdAt,
-  };
-
-  try {
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(profile));
-  } catch (e) {}
-
-  return { success: true, message: 'Signed in with Google successfully!', user: profile };
+  return { success: false, message: 'Please sign in with your official Google account.' };
 };
 
 export const saveGoogleUser = (googleProfile: UserProfile): UserProfile => {
@@ -187,12 +154,23 @@ export const saveGoogleUser = (googleProfile: UserProfile): UserProfile => {
     const newUser: StoredUserAccount = {
       ...googleProfile,
       passwordHash: 'google_oauth_authenticated',
+      emailVerified: googleProfile.emailVerified ?? true,
+      authProvider: googleProfile.authProvider ?? 'google',
     };
     users.unshift(newUser);
     try {
       localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
     } catch (e) {}
     existing = newUser;
+  } else {
+    // If existing, mark emailVerified true if coming from google/firebase
+    if (googleProfile.emailVerified) {
+      existing.emailVerified = true;
+      existing.authProvider = googleProfile.authProvider || existing.authProvider || 'google';
+      try {
+        localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+      } catch (e) {}
+    }
   }
 
   const profile: UserProfile = {
@@ -204,6 +182,8 @@ export const saveGoogleUser = (googleProfile: UserProfile): UserProfile => {
     walletBalance: existing.walletBalance ?? 0,
     referralCode: existing.referralCode,
     createdAt: existing.createdAt,
+    emailVerified: existing.emailVerified ?? googleProfile.emailVerified ?? true,
+    authProvider: existing.authProvider ?? googleProfile.authProvider ?? 'google',
   };
 
   try {
@@ -211,6 +191,29 @@ export const saveGoogleUser = (googleProfile: UserProfile): UserProfile => {
   } catch (e) {}
 
   return profile;
+};
+
+export const setUserEmailVerified = (userId: string, isVerified = true): UserProfile | null => {
+  const users = getRegisteredUsers();
+  const idx = users.findIndex(
+    (u) => u.id === userId || u.email.toLowerCase() === userId.toLowerCase()
+  );
+  if (idx !== -1) {
+    users[idx].emailVerified = isVerified;
+    try {
+      localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+    } catch (e) {}
+  }
+
+  const current = getCurrentUser();
+  if (current && (current.id === userId || current.email.toLowerCase() === userId.toLowerCase())) {
+    current.emailVerified = isVerified;
+    try {
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(current));
+    } catch (e) {}
+    return current;
+  }
+  return current;
 };
 
 export const registerUser = (
@@ -377,7 +380,10 @@ export const topUpWallet = (
     }
 
     const currentBalance = users[userIndex].walletBalance || 0;
-    const newBalance = currentBalance + amount;
+    // 5% Extra Bonus on every top-up (e.g., ৳100 top-up gives ৳105 in wallet)
+    const bonus = Math.round(amount * 0.05);
+    const totalCredited = amount + bonus;
+    const newBalance = currentBalance + totalCredited;
     users[userIndex].walletBalance = newBalance;
     localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
 
@@ -392,10 +398,10 @@ export const topUpWallet = (
       id: `tx_${Date.now()}`,
       userId,
       type: 'credit',
-      amount,
+      amount: totalCredited,
       method,
       trxId,
-      description: `Wallet Top-Up via ${method.toUpperCase()}`,
+      description: `Wallet Top-Up via ${method.toUpperCase()} (Includes 5% Bonus: +৳${bonus})`,
       status: 'completed',
       createdAt: new Date().toISOString(),
     };
@@ -409,10 +415,70 @@ export const topUpWallet = (
     return {
       success: true,
       newBalance,
-      message: `৳${amount} has been added to your wallet successfully! Current balance is ৳${newBalance}.`,
+      message: `৳${amount} টপআপ সফল হয়েছে! ৫% বোনাস (+৳${bonus}) সহ মোট ৳${totalCredited} আপনার ওয়ালেটে জমা হয়েছে। বর্তমান ব্যালেন্স: ৳${newBalance}।`,
     };
   } catch (e) {
     return { success: false, newBalance: 0, message: 'Top-up could not be completed.' };
+  }
+};
+
+export const deductWalletBalance = (
+  userId: string,
+  amount: number,
+  orderId: string
+): { success: boolean; newBalance: number; message: string } => {
+  try {
+    const users = getRegisteredUsers();
+    const userIndex = users.findIndex((u) => u.id === userId);
+    if (userIndex === -1) {
+      return { success: false, newBalance: 0, message: 'User not found.' };
+    }
+
+    const currentBalance = users[userIndex].walletBalance || 0;
+    if (currentBalance < amount) {
+      return {
+        success: false,
+        newBalance: currentBalance,
+        message: `Insufficient wallet balance. You need ৳${amount}, but your current balance is ৳${currentBalance}.`,
+      };
+    }
+
+    const newBalance = currentBalance - amount;
+    users[userIndex].walletBalance = newBalance;
+    localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+
+    const currentUser = getCurrentUser();
+    if (currentUser && currentUser.id === userId) {
+      currentUser.walletBalance = newBalance;
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
+    }
+
+    // Save debit transaction
+    const newTx: WalletTransaction = {
+      id: `tx_${Date.now()}`,
+      userId,
+      type: 'debit',
+      amount,
+      method: 'wallet',
+      trxId: orderId,
+      description: `Payment for Order #${orderId}`,
+      status: 'completed',
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      const rawTx = localStorage.getItem(WALLET_HISTORY_KEY);
+      const list: WalletTransaction[] = rawTx ? JSON.parse(rawTx) : [];
+      localStorage.setItem(WALLET_HISTORY_KEY, JSON.stringify([newTx, ...list]));
+    } catch {}
+
+    return {
+      success: true,
+      newBalance,
+      message: `৳${amount} deducted from wallet balance. Remaining balance: ৳${newBalance}.`,
+    };
+  } catch (e) {
+    return { success: false, newBalance: 0, message: 'Failed to deduct from wallet.' };
   }
 };
 

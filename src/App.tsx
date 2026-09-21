@@ -20,7 +20,9 @@ import { Product, VariationItem, CartItem, OrderDetails, UserProfile } from './t
 import { getCurrentUser, logoutUser } from './utils/authStorage';
 import { getLiveProducts, syncInitialProducts } from './utils/adminStore';
 import { initTrackingScripts, trackGtmEvent } from './utils/trackingInjector';
+import { checkIncomingEmailVerificationLink } from './utils/firebase';
 import { AdminPanel } from './components/admin/AdminPanel';
+import { isApprovedAffiliate, setActiveReferralCode } from './utils/affiliateStorage';
 import { Sparkles, Zap, Flame, Shield, ArrowUpDown, Check, RefreshCw, ChevronRight, ShieldCheck, ArrowLeft } from 'lucide-react';
 
 export default function App() {
@@ -31,6 +33,20 @@ export default function App() {
   // Initialize Real Tracking (Meta Pixel, TikTok Pixel, Google Tag Manager, etc.)
   useEffect(() => {
     initTrackingScripts();
+
+    // Check if user came from a Firebase email verification link
+    const handleIncomingVerification = async () => {
+      try {
+        const linkResult = await checkIncomingEmailVerificationLink();
+        if (linkResult.verified && linkResult.user) {
+          setCurrentUser(linkResult.user);
+          alert(`Your email (${linkResult.user.email}) has been verified successfully via Firebase! You are now logged in.`);
+        }
+      } catch (err) {
+        console.warn('Incoming verification error:', err);
+      }
+    };
+    handleIncomingVerification();
   }, []);
 
   // Live products managed by Admin Panel (changes reflect on live site)
@@ -105,11 +121,18 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'featured' | 'price-low' | 'price-high' | 'name'>('featured');
 
-  // URL deep-linking and browser back/forward navigation support
+  // Check if current user is an approved affiliate
+  const isAffiliate = isApprovedAffiliate(currentUser);
+
+  // URL deep-linking, referral link capture, and browser back/forward navigation support
   useEffect(() => {
-    const syncProductFromUrl = () => {
+    const syncUrlState = () => {
       try {
         const url = new URL(window.location.href);
+        const refParam = url.searchParams.get('ref');
+        if (refParam) {
+          setActiveReferralCode(refParam.trim());
+        }
         const prodParam = url.searchParams.get('product');
         if (prodParam) {
           const found = PRODUCTS.find((p) => p.slug === prodParam || p._id === prodParam);
@@ -126,6 +149,10 @@ export default function App() {
 
     try {
       const url = new URL(window.location.href);
+      const refParam = url.searchParams.get('ref');
+      if (refParam) {
+        setActiveReferralCode(refParam.trim());
+      }
       const prodParam = url.searchParams.get('product');
       if (prodParam) {
         const found = PRODUCTS.find((p) => p.slug === prodParam || p._id === prodParam);
@@ -135,8 +162,8 @@ export default function App() {
       }
     } catch {}
 
-    window.addEventListener('popstate', syncProductFromUrl);
-    return () => window.removeEventListener('popstate', syncProductFromUrl);
+    window.addEventListener('popstate', syncUrlState);
+    return () => window.removeEventListener('popstate', syncUrlState);
   }, []);
 
   // Open customer account dashboard or admin panel
@@ -504,6 +531,7 @@ export default function App() {
             onAddToCart={(prod, variation, qty) => handleAddToCart(prod, variation, qty || 1)}
             onBuyNow={(prod, variation, qty) => handleQuickBuy(prod, variation, qty || 1)}
             onOpenAffiliate={() => handleOpenDashboard('affiliate')}
+            isAffiliate={isAffiliate}
           />
         ) : (
           <>
@@ -567,6 +595,7 @@ export default function App() {
                       onViewProduct={(p) => handleSelectProduct(p)}
                       onAddToCart={(p, v) => handleAddToCart(p, v, 1)}
                       onQuickBuy={(p, v) => handleQuickBuy(p, v, 1)}
+                      isAffiliate={isAffiliate}
                     />
                   ))}
                 </div>
@@ -605,6 +634,7 @@ export default function App() {
                       onViewProduct={(p) => handleSelectProduct(p)}
                       onAddToCart={(p, v) => handleAddToCart(p, v, 1)}
                       onQuickBuy={(p, v) => handleQuickBuy(p, v, 1)}
+                      isAffiliate={isAffiliate}
                     />
                   ))}
                 </div>
@@ -643,6 +673,7 @@ export default function App() {
                       onViewProduct={(p) => handleSelectProduct(p)}
                       onAddToCart={(p, v) => handleAddToCart(p, v, 1)}
                       onQuickBuy={(p, v) => handleQuickBuy(p, v, 1)}
+                      isAffiliate={isAffiliate}
                     />
                   ))}
                 </div>
@@ -681,6 +712,7 @@ export default function App() {
                       onViewProduct={(p) => handleSelectProduct(p)}
                       onAddToCart={(p, v) => handleAddToCart(p, v, 1)}
                       onQuickBuy={(p, v) => handleQuickBuy(p, v, 1)}
+                      isAffiliate={isAffiliate}
                     />
                   ))}
                 </div>
@@ -809,6 +841,7 @@ export default function App() {
                       onViewProduct={(p) => handleSelectProduct(p)}
                       onAddToCart={(p, v) => handleAddToCart(p, v, 1)}
                       onQuickBuy={(p, v) => handleQuickBuy(p, v, 1)}
+                      isAffiliate={isAffiliate}
                     />
                   ))}
                 </div>
@@ -907,6 +940,7 @@ export default function App() {
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
         onProceedCheckout={() => setIsCheckoutOpen(true)}
+        currentUser={currentUser}
       />
 
       {/* Digital Checkout Modal */}
