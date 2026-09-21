@@ -3,6 +3,7 @@ import { ArrowLeft, Shield, Lock, RefreshCw, FileText, Award, CheckCircle2, Cred
 import { SHOP_INFO } from '../data/storeData';
 import { getPage } from '../utils/pagesStorage';
 import { PolicyPage } from '../types';
+import { getThemeConfig } from '../utils/adminStore';
 
 interface PolicyPageViewProps {
   policyKey: string;
@@ -10,18 +11,20 @@ interface PolicyPageViewProps {
 }
 
 const ICON_MAP: Record<string, React.ReactNode> = {
-  refund: <RefreshCw className="w-6 h-6 text-orange-500" />,
-  privacy: <Lock className="w-6 h-6 text-orange-500" />,
-  terms: <FileText className="w-6 h-6 text-orange-500" />,
-  about: <Award className="w-6 h-6 text-orange-500" />,
-  'why-shop': <CheckCircle2 className="w-6 h-6 text-orange-500" />,
-  'payment-methods': <CreditCard className="w-6 h-6 text-orange-500" />,
-  support: <Headphones className="w-6 h-6 text-orange-500" />,
-  faq: <HelpCircle className="w-6 h-6 text-orange-500" />,
+  refund: <RefreshCw className="w-6 h-6 text-[#0052FF]" />,
+  privacy: <Lock className="w-6 h-6 text-[#0052FF]" />,
+  terms: <FileText className="w-6 h-6 text-[#0052FF]" />,
+  about: <Award className="w-6 h-6 text-[#0052FF]" />,
+  'why-shop': <CheckCircle2 className="w-6 h-6 text-[#0052FF]" />,
+  'payment-methods': <CreditCard className="w-6 h-6 text-[#0052FF]" />,
+  support: <Headphones className="w-6 h-6 text-[#0052FF]" />,
+  faq: <HelpCircle className="w-6 h-6 text-[#0052FF]" />,
 };
 
 export const PolicyPageView: React.FC<PolicyPageViewProps> = ({ policyKey, onBack }) => {
-  const [language, setLanguage] = useState<'bn' | 'en'>('bn');
+  const [language, setLanguage] = useState<'bn' | 'en'>(() => {
+    return getThemeConfig().checkoutLanguage === 'bn' ? 'bn' : 'en';
+  });
   const [pageData, setPageData] = useState<PolicyPage>(() => getPage(policyKey));
 
   // Scroll to top and reload page data when policyKey changes
@@ -146,7 +149,7 @@ export const PolicyPageView: React.FC<PolicyPageViewProps> = ({ policyKey, onBac
               onClick={() => setLanguage('bn')}
               className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer ${
                 isBn
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-xs'
+                  ? 'bg-[#0052FF] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 font-medium'
               }`}
             >
@@ -157,7 +160,7 @@ export const PolicyPageView: React.FC<PolicyPageViewProps> = ({ policyKey, onBac
               onClick={() => setLanguage('en')}
               className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer ${
                 !isBn
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-xs'
+                  ? 'bg-[#0052FF] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 font-medium'
               }`}
             >
@@ -168,7 +171,7 @@ export const PolicyPageView: React.FC<PolicyPageViewProps> = ({ policyKey, onBac
 
         {/* Short Summary Callout if available */}
         {summary && (
-          <div className="p-4 rounded-2xl bg-orange-50/80 border border-orange-200/80 text-xs sm:text-sm text-orange-950 font-medium leading-relaxed">
+          <div className="p-4 rounded-2xl bg-blue-50/80 border border-blue-200/80 text-xs sm:text-sm text-blue-950 font-medium leading-relaxed">
             💡 {summary}
           </div>
         )}

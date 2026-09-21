@@ -183,7 +183,7 @@ export const DEFAULT_THEME_CONFIG: ThemeConfig = {
   tertiaryColor: '#00C217',
   dashboardStyle: 'professional',
   searchHints: 'windows 11, vpn, canva, chatgpt, antivirus, idm, ms office',
-  checkoutLanguage: 'bn',
+  checkoutLanguage: 'en',
 };
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
@@ -267,17 +267,17 @@ src="https://www.facebook.com/tr?id=1372451788410293&ev=PageView&noscript=1"
   },
 
   tagManager: {
-    gtmId: 'GTM-N6WQ89P',
+    gtmId: 'GTM-TMMCPB3C',
     ga4MeasurementId: 'G-32984920',
     headScript: `<!-- Google Tag Manager -->
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-N6WQ89P');</script>
+})(window,document,'script','dataLayer','GTM-TMMCPB3C');</script>
 <!-- End Google Tag Manager -->`,
     bodyNoScript: `<!-- Google Tag Manager (noscript) -->
-<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-N6WQ89P"
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TMMCPB3C"
 height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <!-- End Google Tag Manager (noscript) -->`,
     ecommerceDataLayer: true,
@@ -518,7 +518,18 @@ export const getStoreSettings = (): StoreSettings => {
       tiktokPixel: typeof parsed.tiktokPixel === 'object' && parsed.tiktokPixel !== null
         ? { ...DEFAULT_STORE_SETTINGS.tiktokPixel, ...parsed.tiktokPixel }
         : { ...DEFAULT_STORE_SETTINGS.tiktokPixel, pixelId: typeof parsed.tiktokPixel === 'string' ? parsed.tiktokPixel : DEFAULT_STORE_SETTINGS.tiktokPixel.pixelId },
-      tagManager: { ...DEFAULT_STORE_SETTINGS.tagManager, ...(parsed.tagManager || {}) },
+      tagManager: (() => {
+        const tm = typeof parsed.tagManager === 'object' && parsed.tagManager !== null
+          ? { ...DEFAULT_STORE_SETTINGS.tagManager, ...parsed.tagManager }
+          : { ...DEFAULT_STORE_SETTINGS.tagManager };
+        if (tm.gtmId === 'GTM-N6WQ89P' || !tm.gtmId) {
+          tm.gtmId = 'GTM-TMMCPB3C';
+          tm.headScript = DEFAULT_STORE_SETTINGS.tagManager.headScript;
+          tm.bodyNoScript = DEFAULT_STORE_SETTINGS.tagManager.bodyNoScript;
+        }
+        tm.enabled = true;
+        return tm;
+      })(),
       fraudCheck: { ...DEFAULT_STORE_SETTINGS.fraudCheck, ...(parsed.fraudCheck || {}) },
       socialLogin: { ...DEFAULT_STORE_SETTINGS.socialLogin, ...(parsed.socialLogin || {}) },
       facebookCatalog: { ...DEFAULT_STORE_SETTINGS.facebookCatalog, ...(parsed.facebookCatalog || {}) },

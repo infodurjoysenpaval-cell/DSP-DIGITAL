@@ -89,7 +89,7 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
       const saved = saveGoogleUser(googleUser);
       onUserChange(saved);
       setLoading(false);
-      setSuccessMsg(`DSP DIGITAL MART-এ (${saved.email}) দিয়ে সফলভাবে লগইন হয়েছে!`);
+      setSuccessMsg(`Signed in to DSP DIGITAL MART successfully as ${saved.email}!`);
       setTimeout(() => {
         setShowGoogleChooser(false);
         onClose();
@@ -139,7 +139,7 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
                   const saved = saveGoogleUser(googleUser);
                   onUserChange(saved);
                   setLoading(false);
-                  setSuccessMsg(`DSP DIGITAL MART-এ অফিশিয়াল গুগল অ্যাকাউন্ট (${saved.email}) দিয়ে সফলভাবে লগইন হয়েছে!`);
+                  setSuccessMsg(`Signed in with Google successfully as ${saved.email}!`);
                   setTimeout(() => {
                     onClose();
                     onOpenDashboard?.(saved);
@@ -200,7 +200,7 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
     setSuccessMsg('');
 
     if (regPassword !== regConfirmPassword) {
-      setErrorMsg('পাসওয়ার্ড এবং নিশ্চিতকরণ পাসওয়ার্ড মিলছে না!');
+      setErrorMsg('Password and confirm password do not match!');
       return;
     }
 

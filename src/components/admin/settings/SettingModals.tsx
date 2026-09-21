@@ -321,7 +321,7 @@ export const SettingModals: React.FC<SettingModalsProps> = ({
                         tagManager: { ...settings.tagManager, gtmId: e.target.value },
                       })
                     }
-                    placeholder="GTM-N6WQ89P"
+                    placeholder="GTM-TMMCPB3C"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-mono text-xs focus:outline-none focus:border-[#0052FF]"
                   />
                 </div>

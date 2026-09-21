@@ -154,19 +154,19 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     ? product.faqList
     : [
         {
-          question: 'অর্ডার করার পর ডেলিভারি কীভাবে পাব?',
+          question: 'How will I receive delivery after ordering?',
           answer:
-            'অর্ডার কনফার্ম করার পর সর্বোচ্চ ৩ ঘণ্টার মধ্যে (সাধারণত ৩০ মিনিটের ভেতর) আপনার প্রদত্ত ইমেইল ও হোয়াটসঅ্যাপে অফিশিয়াল ইনভাইটেশন লিংক অথবা লাইসেন্স কী পাঠানো হবে।',
+            'After confirming your order, official invitation links, login credentials, or license keys are delivered to your provided email address and WhatsApp within 3 hours (usually within 15–30 minutes).',
         },
         {
-          question: 'এটির মেয়াদ এবং ওয়ারেন্টি পলিসি কী?',
+          question: 'What is the warranty and validity policy?',
           answer:
-            'সম্পূর্ণ মেয়াদের জন্য ১০০% রিপ্লেসমেন্ট গ্যারান্টি প্রদান করা হয়। কোনো সমস্যা হলে আমাদের ২৪/৭ হোয়াটসঅ্যাপ সাপোর্ট টিমের মাধ্যমে তাৎক্ষণিক সমাধান পাবেন।',
+            'All products include a 100% full replacement warranty for the entire validity period. If you experience any issues, our 24/7 WhatsApp customer support team provides immediate assistance.',
         },
         {
-          question: 'পেমেন্ট মেথড কী কী সাপোর্টেড?',
+          question: 'Which payment methods are supported?',
           answer:
-            'বিকাশ (bKash), নগদ (Nagad), রকেট (Rocket) এবং কার্ড পেমেন্টের মাধ্যমে খুব সহজে নিরাপদ পেমেন্ট করতে পারবেন।',
+            'We support automated instant payments via bKash, Nagad, Rocket, debit/credit cards, and direct bank transfers.',
         },
       ];
 
@@ -486,9 +486,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               />
             ) : (
               <p>
-                গুগলের শক্তিশালী AI মডেল Gemini 3 Pro সহ Google AI Pro এর Premium Access নিন BM DIGITAL / DSP DIGITAL MART থেকে।
-                এর সাথে পাবেন Google Flow, প্রতি মাসে 1,000 Flow Credits, 5TB Storage, Google AI Studio, NotebookLM, Jules,
-                Antigravity এবং আরও অনেক Premium AI সুবিধা।
+                Get authentic premium access to cutting-edge digital services from DSP DIGITAL MART.
+                Enjoy seamless activation, full validity coverage, prompt digital delivery, and dedicated 24/7 technical support.
               </p>
             )}
           </div>
@@ -498,24 +497,24 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
               <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold text-slate-800 block">১০০% অফিশিয়াল প্রিমিয়াম অ্যাক্সেস</span>
-                <span className="text-slate-500 text-xs">আপনার নিজস্ব ইমেইলে ইনভাইটেশন বা অফিশিয়াল ক্রেডেনশিয়াল</span>
+                <span className="font-bold text-slate-800 block">100% Official Premium Access</span>
+                <span className="text-slate-500 text-xs">Official invitations or verified credentials delivered to your email</span>
               </div>
             </div>
 
             <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
               <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold text-slate-800 block">ইনস্ট্যান্ট ডেলিভারি (৩ ঘণ্টার মধ্যে)</span>
-                <span className="text-slate-500 text-xs">অর্ডার করার পরপরই হোয়াটসঅ্যাপ ও ইমেইলে অ্যাক্সেস পাঠানো হয়</span>
+                <span className="font-bold text-slate-800 block">Fast Digital Delivery (Within 3 Hours)</span>
+                <span className="text-slate-500 text-xs">Access details sent promptly to WhatsApp and email</span>
               </div>
             </div>
 
             <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
               <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold text-slate-800 block">ফুল রিপ্লেসমেন্ট ওয়ারেন্টি</span>
-                <span className="text-slate-500 text-xs">মেয়াদকালীন যেকোনো সমস্যায় তাৎক্ষণিক সাপোর্ট গ্যারান্টি</span>
+                <span className="font-bold text-slate-800 block">Full Replacement Warranty</span>
+                <span className="text-slate-500 text-xs">Guaranteed active coverage with instant technical assistance</span>
               </div>
             </div>
           </div>
@@ -524,20 +523,20 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           <div className="mt-6 p-5 rounded-2xl bg-blue-50/50 border border-blue-100 text-xs sm:text-sm text-slate-700 space-y-2">
             <h4 className="font-bold text-blue-900 flex items-center gap-1.5 text-sm">
               <Info className="w-4 h-4 text-blue-600" />
-              <span>কীভাবে অ্যাক্সেস পাবেন? (ডেলিভারি প্রসেস)</span>
+              <span>How will you receive access? (Delivery Process)</span>
             </h4>
             <ol className="list-decimal list-inside space-y-1 text-slate-600">
-              <li>অর্ডার করার সময় আপনার সচল ইমেইল অ্যাড্রেস ও হোয়াটসঅ্যাপ নম্বর দিন।</li>
-              <li>পেমেন্ট কনফার্ম হলে আমাদের টিম আপনার ইমেইলে অফিশিয়াল ইনভাইটেশন বা লগইন ডিটেইলস পাঠাবে।</li>
-              <li>ইনভাইটেশন লিঙ্ক একসেপ্ট করে সাথে সাথে প্রিমিয়াম ফিচারের সম্পূর্ণ সুবিধা উপভোগ করুন।</li>
+              <li>Provide your active email address and WhatsApp number when placing your order.</li>
+              <li>Once payment is confirmed, our automated system and dispatch team send official access details to you.</li>
+              <li>Accept the invitation or sign in with your credentials to start enjoying full premium features immediately.</li>
             </ol>
           </div>
 
           {/* Frequently Asked Questions */}
           <div className="mt-8 pt-6 border-t border-slate-100">
             <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
-              <HelpCircle className="w-5 h-5 text-[#FF6B00]" />
-              <span>সাধারণ জিজ্ঞাসা (FAQ)</span>
+              <HelpCircle className="w-5 h-5 text-[#0052FF]" />
+              <span>Frequently Asked Questions (FAQ)</span>
             </h3>
 
             <div className="space-y-2">

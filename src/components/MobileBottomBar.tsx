@@ -33,7 +33,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
   // WhatsApp Support link
   const rawPhone = SHOP_INFO.phones?.[0]?.value || '8801712792184';
   const phone = rawPhone.replace(/[^0-9]/g, '');
-  const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent('আসসালামু আলাইকুম, DSP Digital Mart থেকে সহায়তা প্রয়োজন।')}`;
+  const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent('Hello, I need assistance from DSP Digital Mart.')}`;
 
   // Scroll collapse effect: Shrinks menu & hides labels when scrolling down
   useEffect(() => {

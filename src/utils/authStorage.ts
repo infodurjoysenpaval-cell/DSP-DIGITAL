@@ -70,10 +70,10 @@ export const loginUser = (
   const cleanPass = password.trim();
 
   if (!cleanId) {
-    return { success: false, message: 'অনুগ্রহ করে আপনার মোবাইল নম্বর অথবা ইমেইল দিন।' };
+    return { success: false, message: 'Please enter your mobile number or email address.' };
   }
   if (!cleanPass) {
-    return { success: false, message: 'অনুগ্রহ করে পাসওয়ার্ড দিন।' };
+    return { success: false, message: 'Please enter your password.' };
   }
 
   // Admin Login Support (accepts admin@gmail.com or admin as email/username with admin or admin@gmail.com as password)
@@ -95,7 +95,7 @@ export const loginUser = (
     try {
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(adminProfile));
     } catch (e) {}
-    return { success: true, message: 'অ্যাডমিন প্যানেলে স্বাগতম!', user: adminProfile };
+    return { success: true, message: 'Welcome to Admin Panel!', user: adminProfile };
   }
 
   const users = getRegisteredUsers();
@@ -108,14 +108,14 @@ export const loginUser = (
   if (!found) {
     return {
       success: false,
-      message: 'এই মোবাইল নম্বর বা ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি। অনুগ্রহ করে নতুন একাউন্ট খুলুন।',
+      message: 'No account found with this phone number or email. Please create a new account.',
     };
   }
 
   if (found.passwordHash !== cleanPass) {
     return {
       success: false,
-      message: 'ভুল পাসওয়ার্ড! দয়া করে সঠিক পাসওয়ার্ড দিন।',
+      message: 'Incorrect password! Please enter the correct password.',
     };
   }
 
@@ -135,7 +135,7 @@ export const loginUser = (
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(profile));
   } catch (e) {}
 
-  return { success: true, message: 'সফলভাবে লগইন হয়েছে!', user: profile };
+  return { success: true, message: 'Logged in successfully!', user: profile };
 };
 
 export const loginWithGoogle = (): { success: boolean; message: string; user?: UserProfile } => {
@@ -176,7 +176,7 @@ export const loginWithGoogle = (): { success: boolean; message: string; user?: U
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(profile));
   } catch (e) {}
 
-  return { success: true, message: 'Google দিয়ে সফলভাবে সাইন ইন করা হয়েছে!', user: profile };
+  return { success: true, message: 'Signed in with Google successfully!', user: profile };
 };
 
 export const saveGoogleUser = (googleProfile: UserProfile): UserProfile => {
@@ -227,24 +227,24 @@ export const registerUser = (
   const cleanPass = password.trim();
 
   if (!cleanName || cleanName.length < 3) {
-    return { success: false, message: 'অনুগ্রহ করে আপনার সম্পূর্ণ নাম (কমপক্ষে ৩ অক্ষর) দিন।' };
+    return { success: false, message: 'Please enter your full name (at least 3 characters).' };
   }
 
   // Bangladesh Mobile Number check (11 digits e.g. 01XXXXXXXXX)
   const phoneDigits = cleanPhone.replace(/[^0-9]/g, '');
   if (phoneDigits.length !== 11 || !phoneDigits.startsWith('01')) {
-    return { success: false, message: 'অনুগ্রহ করে সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)।' };
+    return { success: false, message: 'Please enter a valid 11-digit mobile number (e.g., 017XXXXXXXX).' };
   }
 
   // Email format validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!cleanEmail || !emailRegex.test(cleanEmail)) {
-    return { success: false, message: 'অনুগ্রহ করে সঠিক ইমেইল এড্রেস প্রদান করুন।' };
+    return { success: false, message: 'Please enter a valid email address.' };
   }
 
   // Password validation (at least 6 characters)
   if (!cleanPass || cleanPass.length < 6) {
-    return { success: false, message: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' };
+    return { success: false, message: 'Password must be at least 6 characters.' };
   }
 
   const users = getRegisteredUsers();
@@ -254,12 +254,12 @@ export const registerUser = (
     (u) => u.phone.replace(/[^0-9]/g, '') === phoneDigits
   );
   if (existingPhone) {
-    return { success: false, message: 'এই মোবাইল নম্বরে ইতিমধ্যে একটি একাউন্ট রয়েছে। অনুগ্রহ করে লগইন করুন।' };
+    return { success: false, message: 'An account with this mobile number already exists. Please log in.' };
   }
 
   const existingEmail = users.find((u) => u.email.toLowerCase() === cleanEmail);
   if (existingEmail) {
-    return { success: false, message: 'এই ইমেইল এড্রেসে ইতিমধ্যে একটি একাউন্ট রয়েছে। অনুগ্রহ করে লগইন করুন।' };
+    return { success: false, message: 'An account with this email address already exists. Please log in.' };
   }
 
   const referralCode = generateReferralCode(cleanName);
@@ -298,7 +298,7 @@ export const registerUser = (
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(profile));
   } catch (e) {}
 
-  return { success: true, message: 'অভিনন্দন! আপনার একাউন্ট সফলভাবে তৈরি হয়েছে।', user: profile };
+  return { success: true, message: 'Congratulations! Your account has been created successfully.', user: profile };
 };
 
 export const logoutUser = (): void => {
@@ -315,7 +315,7 @@ export const updateUserProfile = (
     const users = getRegisteredUsers();
     const userIndex = users.findIndex((u) => u.id === userId);
     if (userIndex === -1) {
-      return { success: false, message: 'ব্যবহারকারী পাওয়া যায়নি।' };
+      return { success: false, message: 'User not found.' };
     }
 
     const current = users[userIndex];
@@ -334,12 +334,12 @@ export const updateUserProfile = (
         ...updatedData,
       };
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newProfile));
-      return { success: true, user: newProfile, message: 'প্রোফাইল সফলভাবে আপডেট হয়েছে!' };
+      return { success: true, user: newProfile, message: 'Profile updated successfully!' };
     }
 
-    return { success: true, message: 'প্রোফাইল আপডেট হয়েছে!' };
+    return { success: true, message: 'Profile updated!' };
   } catch (e) {
-    return { success: false, message: 'প্রোফাইল আপডেট ব্যর্থ হয়েছে।' };
+    return { success: false, message: 'Failed to update profile.' };
   }
 };
 
@@ -373,7 +373,7 @@ export const topUpWallet = (
     const users = getRegisteredUsers();
     const userIndex = users.findIndex((u) => u.id === userId);
     if (userIndex === -1) {
-      return { success: false, newBalance: 0, message: 'ব্যবহারকারী পাওয়া যায়নি।' };
+      return { success: false, newBalance: 0, message: 'User not found.' };
     }
 
     const currentBalance = users[userIndex].walletBalance || 0;
@@ -409,10 +409,10 @@ export const topUpWallet = (
     return {
       success: true,
       newBalance,
-      message: `৳${amount} ওয়ালেটে সফলভাবে যোগ করা হয়েছে! বর্তমান ব্যালেন্স ৳${newBalance}।`,
+      message: `৳${amount} has been added to your wallet successfully! Current balance is ৳${newBalance}.`,
     };
   } catch (e) {
-    return { success: false, newBalance: 0, message: 'টপ-আপ সম্পন্ন হতে পারেনি।' };
+    return { success: false, newBalance: 0, message: 'Top-up could not be completed.' };
   }
 };
 
@@ -432,23 +432,23 @@ export const bindUserReferrer = (
   referrerCode: string
 ): { success: boolean; message: string } => {
   const cleanCode = referrerCode.trim().toUpperCase();
-  if (!cleanCode) return { success: false, message: 'অনুগ্রহ করে রেফারেল কোড দিন।' };
+  if (!cleanCode) return { success: false, message: 'Please provide a referral code.' };
 
   const users = getRegisteredUsers();
   const currentUserIndex = users.findIndex((u) => u.id === userId);
-  if (currentUserIndex === -1) return { success: false, message: 'ব্যবহারকারী পাওয়া যায়নি।' };
+  if (currentUserIndex === -1) return { success: false, message: 'User not found.' };
 
   if (users[currentUserIndex].referralCode === cleanCode) {
-    return { success: false, message: 'আপনি নিজের রেফারেল কোড ব্যবহার করতে পারবেন না।' };
+    return { success: false, message: 'You cannot use your own referral code.' };
   }
 
   if (users[currentUserIndex].referredBy) {
-    return { success: false, message: 'আপনি ইতিমধ্যে একজন রেফারারের সাথে যুক্ত আছেন।' };
+    return { success: false, message: 'You are already bound to a referrer.' };
   }
 
   const referrer = users.find((u) => u.referralCode?.toUpperCase() === cleanCode);
   if (!referrer) {
-    return { success: false, message: 'অবৈধ রেফারেল কোড! অনুগ্রহ করে সঠিক কোড দিন।' };
+    return { success: false, message: 'Invalid referral code! Please enter a valid code.' };
   }
 
   users[currentUserIndex].referredBy = cleanCode;
@@ -460,7 +460,7 @@ export const bindUserReferrer = (
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(cur));
   }
 
-  return { success: true, message: `রেফারার (${referrer.name}) সফলভাবে যুক্ত হয়েছে!` };
+  return { success: true, message: `Referrer (${referrer.name}) successfully bound!` };
 };
 
 export const saveOrderToHistory = (order: OrderDetails): void => {

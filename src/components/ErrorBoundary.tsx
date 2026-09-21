@@ -51,7 +51,7 @@ export class ErrorBoundary extends Component<Props, State> {
               DSP DIGITAL MART
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mb-6 leading-relaxed">
-              সিস্টেম ব্যবহারে সাময়িক সমস্যা দেখা দিয়েছে। ওয়েবসাইটটি পুনরায় লোড করতে নিচের বাটনে ক্লিক করুন।
+              A temporary issue occurred while loading this page. Please click the button below to reload the website.
             </p>
 
             {this.state.error?.message && (
@@ -69,7 +69,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-600/20"
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>ওয়েবসাইট রিফ্রেশ করুন (Reload)</span>
+                <span>Reload Website</span>
               </button>
 
               <button
@@ -78,7 +78,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="w-full py-2.5 px-4 bg-slate-700/80 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer border border-slate-600/50"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>ক্লিয়ার ক্যাশ ও রিস্টার্ট (Reset App)</span>
+                <span>Clear Cache & Reset App</span>
               </button>
             </div>
           </div>

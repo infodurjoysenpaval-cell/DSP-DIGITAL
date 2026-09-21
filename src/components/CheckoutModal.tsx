@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, Phone, Mail, User, ArrowLeft, Copy, Check, Sparkles, LogIn, ShoppingBag, Zap, Tag, Shield } from 'lucide-react';
 import { CartItem, OrderDetails, UserProfile } from '../types';
 import { SHOP_INFO } from '../data/storeData';
+import { getStoreSettings } from '../utils/adminStore';
 import { saveOrderToHistory } from '../utils/authStorage';
 import { saveIncompleteOrderDraft, resolveIncompleteOrder } from '../utils/incompleteOrdersStore';
-import { trackMetaEvent } from '../utils/trackingInjector';
+import { trackMetaEvent, trackGtmEvent } from '../utils/trackingInjector';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -33,7 +34,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [email, setEmail] = useState(currentUser?.email || '');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'auto' | 'bkash' | 'nagad' | 'rocket' | 'bank'>('auto');
+  const [paymentMethod, setPaymentMethod] = useState<'bkash' | 'nagad' | 'rocket'>('bkash');
+  const [senderPhone, setSenderPhone] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [couponCode, setCouponCode] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
@@ -126,10 +128,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const overallDiscountPercent = originalTotal > 0 ? Math.round(((originalTotal - totalAmount) / originalTotal) * 100) : 0;
 
-  const paymentNumber = SHOP_INFO.whatsappNumber.replace(/[^0-9]/g, '');
+  const storeSettings = getStoreSettings();
+  const getProviderNumber = (method: 'bkash' | 'nagad' | 'rocket') => {
+    const fallbackNumber = SHOP_INFO.whatsappNumber.replace(/[^0-9]/g, '') || '01712792184';
+    if (method === 'bkash') {
+      return storeSettings.paymentMethods?.bkash?.number || fallbackNumber;
+    }
+    if (method === 'nagad') {
+      return storeSettings.paymentMethods?.nagad?.number || fallbackNumber;
+    }
+    return storeSettings.paymentMethods?.rocket?.number || fallbackNumber;
+  };
+
+  const currentPaymentNumber = getProviderNumber(paymentMethod);
 
   const copyPaymentNumber = () => {
-    navigator.clipboard.writeText(paymentNumber);
+    navigator.clipboard.writeText(currentPaymentNumber);
     setCopiedNumber(true);
     setTimeout(() => setCopiedNumber(false), 2000);
   };
@@ -182,15 +196,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setIsSubmitting(true);
 
     const generatedOrderId = `DSP-${Math.floor(100000 + Math.random() * 900000)}`;
+    const fullNotes = [
+      notes.trim(),
+      senderPhone.trim() ? `Sender Number (${paymentMethod}): ${senderPhone.trim()}` : '',
+    ].filter(Boolean).join(' | ');
+
     const newOrder: OrderDetails = {
       orderId: generatedOrderId,
       userId: currentUser?.id,
-      customerName,
-      phone,
-      email,
-      notes,
+      customerName: customerName.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      notes: fullNotes,
       items,
-      paymentMethod: paymentMethod === 'auto' ? 'bkash' : paymentMethod,
+      paymentMethod,
       transactionId: transactionId.trim() || undefined,
       totalAmount,
       createdAt: new Date().toISOString(),
@@ -213,6 +232,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         fn: customerName.trim(),
       }
     );
+
+    trackGtmEvent('purchase', {
+      transaction_id: generatedOrderId,
+      value: totalAmount,
+      currency: 'BDT',
+      items: items.map((i) => ({
+        item_id: i.product._id,
+        item_name: i.product.name,
+        price: i.selectedVariation?.salePrice ?? i.product.salePrice,
+        quantity: i.quantity,
+      })),
+    });
 
     resolveIncompleteOrder(phone);
     if (email) resolveIncompleteOrder(email);
@@ -269,14 +300,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <button
                 type="button"
                 onClick={handleClose}
-                className="mt-2 px-5 py-2.5 bg-orange-600 text-white text-xs font-bold rounded-full transition-all"
+                className="mt-2 px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-full transition-all"
               >
                 Browse Products
               </button>
             </div>
           ) : (
             <form id="checkout-form" onSubmit={handleSubmitOrder} className="space-y-4">
-              {/* Top Product Summary Box (Matching Reference Image 1) */}
+              {/* Top Product Summary Box */}
               <div className="bg-slate-100/90 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 border border-slate-200/60">
                 <div className="flex items-center gap-3 min-w-0">
                   {imgUrl ? (
@@ -306,7 +337,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     Tk {totalAmount.toLocaleString()}
                   </span>
                   {overallDiscountPercent > 0 && (
-                    <span className="inline-block bg-[#ff5500] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md mt-0.5">
+                    <span className="inline-block bg-[#2563EB] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md mt-0.5">
                       -{overallDiscountPercent}%
                     </span>
                   )}
@@ -329,7 +360,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   placeholder="Full name"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-full text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-full text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
                 />
 
                 <input
@@ -338,7 +369,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   placeholder="Phone number"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-full text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-full text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
                 />
 
                 <input
@@ -347,100 +378,175 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   placeholder="Email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-full text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-full text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
                 />
               </div>
 
-              {/* Gmail / Notes Input */}
+              {/* Gmail / Delivery Email Notes */}
               <div className="space-y-2 pt-1">
-                <h3 className="text-sm font-bold text-slate-900">Gmail</h3>
+                <h3 className="text-sm font-bold text-slate-900">Delivery Email / Notes</h3>
 
                 <textarea
                   rows={2}
-                  placeholder="Enter email address where you want to receive digital access"
+                  placeholder="Enter email address where you want to receive digital access or delivery notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-2xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all resize-none"
+                  className="w-full p-3.5 bg-white border border-slate-200 rounded-2xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all resize-none"
                 />
               </div>
 
-              {/* Payment Method Selector */}
+              {/* Payment Method Selector (bKash, Nagad, Rocket) */}
               <div className="space-y-2.5 pt-1">
-                <h3 className="text-sm font-bold text-slate-900">Payment Method</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900">Payment Method (পেমেন্ট মেথড)</h3>
+                  <span className="text-[11px] font-semibold text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-full">
+                    ম্যানুয়াল পেমেন্ট
+                  </span>
+                </div>
 
-                {/* Option 1: Auto / Online Gateway (Selected Box in Image 1) */}
-                <div
-                  onClick={() => setPaymentMethod('auto')}
-                  className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                    paymentMethod === 'auto'
-                      ? 'border-orange-500 bg-orange-50/20'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full border-2 border-orange-500 flex items-center justify-center shrink-0">
-                      {paymentMethod === 'auto' && <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />}
+                {/* 3 Payment Options: bKash, Nagad, Rocket */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  {/* bKash */}
+                  <div
+                    id="payment-method-bkash"
+                    onClick={() => setPaymentMethod('bkash')}
+                    className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5 ${
+                      paymentMethod === 'bkash'
+                        ? 'border-[#2563EB] bg-[#2563EB]/5 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-[#E2136E]/10 border border-[#E2136E]/20 flex items-center justify-center font-bold text-xs text-[#E2136E]">
+                      বিকাশ
                     </div>
-
-                    <div className="w-7 h-5 bg-amber-500/10 border border-amber-300/40 rounded flex items-center justify-center shrink-0 text-amber-600 font-bold text-[10px]">
-                      💳
+                    <div>
+                      <span className="block text-xs font-bold text-slate-900">bKash</span>
+                      <span className="text-[10px] text-slate-500 font-medium">Send Money</span>
                     </div>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 ${paymentMethod === 'bkash' ? 'border-[#2563EB]' : 'border-slate-300'}`}>
+                      {paymentMethod === 'bkash' && <div className="w-2 h-2 rounded-full bg-[#2563EB]" />}
+                    </div>
+                  </div>
 
-                    <span className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
-                      Bkash, Nagad, Roket, Upay, Bank, & Visa/Mastercard Auto Payment
-                    </span>
+                  {/* Nagad */}
+                  <div
+                    id="payment-method-nagad"
+                    onClick={() => setPaymentMethod('nagad')}
+                    className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5 ${
+                      paymentMethod === 'nagad'
+                        ? 'border-[#2563EB] bg-[#2563EB]/5 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-[#F7941D]/10 border border-[#F7941D]/20 flex items-center justify-center font-bold text-xs text-[#F7941D]">
+                      নগদ
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-slate-900">Nagad</span>
+                      <span className="text-[10px] text-slate-500 font-medium">Send Money</span>
+                    </div>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 ${paymentMethod === 'nagad' ? 'border-[#2563EB]' : 'border-slate-300'}`}>
+                      {paymentMethod === 'nagad' && <div className="w-2 h-2 rounded-full bg-[#2563EB]" />}
+                    </div>
+                  </div>
+
+                  {/* Rocket */}
+                  <div
+                    id="payment-method-rocket"
+                    onClick={() => setPaymentMethod('rocket')}
+                    className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5 ${
+                      paymentMethod === 'rocket'
+                        ? 'border-[#2563EB] bg-[#2563EB]/5 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-[#8C3494]/10 border border-[#8C3494]/20 flex items-center justify-center font-bold text-xs text-[#8C3494]">
+                      রকেট
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-slate-900">Rocket</span>
+                      <span className="text-[10px] text-slate-500 font-medium">Send Money</span>
+                    </div>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 ${paymentMethod === 'rocket' ? 'border-[#2563EB]' : 'border-slate-300'}`}>
+                      {paymentMethod === 'rocket' && <div className="w-2 h-2 rounded-full bg-[#2563EB]" />}
+                    </div>
                   </div>
                 </div>
 
-                {/* Option 2: Live Payment / Manual bKash */}
-                <div
-                  onClick={() => setPaymentMethod('bkash')}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                    paymentMethod === 'bkash'
-                      ? 'border-orange-500 bg-orange-50/20 border-2'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center shrink-0">
-                      {paymentMethod === 'bkash' && <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />}
+                {/* Manual Payment Details & Instructions Box */}
+                <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl text-xs space-y-3 mt-2">
+                  <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200/70">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">
+                        {paymentMethod === 'bkash' ? 'bKash Personal Number' : paymentMethod === 'nagad' ? 'Nagad Personal Number' : 'Rocket Personal Number'} (Send Money)
+                      </span>
+                      <span className="font-mono text-sm font-bold text-slate-900 tracking-wider">
+                        {currentPaymentNumber}
+                      </span>
                     </div>
 
-                    <div className="w-7 h-5 bg-pink-50 border border-pink-200 rounded flex items-center justify-center shrink-0 text-[#E2136E] font-bold text-[10px]">
-                      📱
+                    <button
+                      type="button"
+                      onClick={copyPaymentNumber}
+                      className="px-3 py-1.5 bg-white hover:bg-slate-100 text-[#2563EB] border border-[#2563EB]/30 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    >
+                      {copiedNumber ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-600">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="bg-[#2563EB]/5 border border-[#2563EB]/15 rounded-xl p-2.5 text-[11px] text-slate-700 space-y-1">
+                    <p className="font-semibold text-slate-900">
+                      পরিশোধের নিয়মাবলী (Manual Payment Instructions):
+                    </p>
+                    <p>
+                      ১. আপনার <span className="font-bold text-[#2563EB] capitalize">{paymentMethod}</span> একাউন্ট থেকে উপরে দেওয়া নম্বরে <b>৳ {totalAmount.toLocaleString()}</b> টাকা <b>Send Money</b> করুন।
+                    </p>
+                    <p>
+                      ২. সফলভাবে টাকা পাঠানোর পর প্রাপ্ত TrxID এবং আপনার নম্বরটি নিচের বক্সে লিখুন।
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        আপনার প্রেরক নম্বর (Sender Number)
+                      </label>
+                      <input
+                        type="tel"
+                        placeholder="e.g. 017XXXXXXXX"
+                        value={senderPhone}
+                        onChange={(e) => setSenderPhone(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
+                      />
                     </div>
 
-                    <span className="text-xs sm:text-sm font-bold text-slate-800">
-                      Bkash Live Payment / Send Money
-                    </span>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        ট্রানজেকশন আইডি (TrxID)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 9J87AKL1"
+                        value={transactionId}
+                        onChange={(e) => setTransactionId(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono uppercase placeholder:normal-case placeholder:font-sans placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
+                      />
+                    </div>
                   </div>
                 </div>
-
-                {/* Optional TrxID box if manual bKash/send money selected */}
-                {paymentMethod !== 'auto' && (
-                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-2 mt-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-700">Personal Number: {paymentNumber}</span>
-                      <button
-                        type="button"
-                        onClick={copyPaymentNumber}
-                        className="text-orange-600 hover:underline font-bold text-[11px]"
-                      >
-                        {copiedNumber ? 'Copied' : 'Copy Number'}
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Transaction ID / TrxID (optional)"
-                      value={transactionId}
-                      onChange={(e) => setTransactionId(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono uppercase focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-                )}
               </div>
 
-              {/* Have a coupon? Section (Matching Reference Image 2) */}
+              {/* Have a coupon? Section */}
               <div className="pt-2 border-t border-slate-100 space-y-2">
                 <h3 className="text-sm font-bold text-slate-900">Have a coupon?</h3>
 
@@ -452,14 +558,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       placeholder="COUPON CODE"
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-full text-xs sm:text-sm font-mono uppercase placeholder:normal-case placeholder:font-sans focus:outline-none focus:border-orange-500 transition-all"
+                      className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-full text-xs sm:text-sm font-mono uppercase placeholder:normal-case placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
                     />
                   </div>
 
                   <button
                     type="button"
                     onClick={handleApplyCoupon}
-                    className="px-6 py-2.5 bg-[#ff9966] hover:bg-orange-500 text-white font-bold rounded-full text-xs sm:text-sm transition-colors shrink-0 cursor-pointer shadow-2xs"
+                    className="px-6 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-full text-xs sm:text-sm transition-colors shrink-0 cursor-pointer shadow-2xs"
                   >
                     Apply
                   </button>
@@ -472,7 +578,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 )}
               </div>
 
-              {/* Total Summary Row (Matching Reference Image 2) */}
+              {/* Total Summary Row */}
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-base font-medium text-slate-600">Total</span>
                 <span className="text-2xl font-black text-slate-900 font-price-text">
@@ -480,22 +586,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </span>
               </div>
 
-              {/* Confirm & Pay Main Orange Button (Matching Reference Image 2) */}
+              {/* Confirm & Pay Main Button */}
               <div className="pt-1">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-3.5 sm:py-4 bg-[#ff5500] hover:bg-[#e64d00] active:scale-[0.99] disabled:bg-slate-300 text-white font-bold text-base sm:text-lg rounded-full shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
+                  className="w-full py-3.5 sm:py-4 bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.99] disabled:bg-slate-300 text-white font-bold text-base sm:text-lg rounded-full shadow-lg shadow-[#2563EB]/25 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
                 >
                   <Zap className="w-5 h-5 fill-white text-white" />
-                  <span>{isSubmitting ? 'Processing...' : 'Confirm & Pay'}</span>
+                  <span>{isSubmitting ? 'Processing...' : 'Confirm Order & Pay'}</span>
                 </button>
               </div>
 
               {/* Bottom Security Note */}
               <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 pt-1">
                 <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                <span>Secure & encrypted</span>
+                <span>Secure & encrypted manual payment</span>
               </div>
             </form>
           )}

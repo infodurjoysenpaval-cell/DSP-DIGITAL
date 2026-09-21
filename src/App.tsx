@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Header } from './components/Header';
 import { HeroBanner } from './components/HeroBanner';
 import { CategoryBar } from './components/CategoryBar';
@@ -19,7 +19,7 @@ import { PRODUCTS, CATEGORIES, SHOP_INFO } from './data/storeData';
 import { Product, VariationItem, CartItem, OrderDetails, UserProfile } from './types';
 import { getCurrentUser, logoutUser } from './utils/authStorage';
 import { getLiveProducts, syncInitialProducts } from './utils/adminStore';
-import { initTrackingScripts } from './utils/trackingInjector';
+import { initTrackingScripts, trackGtmEvent } from './utils/trackingInjector';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { Sparkles, Zap, Flame, Shield, ArrowUpDown, Check, RefreshCw, ChevronRight, ShieldCheck, ArrowLeft } from 'lucide-react';
 
@@ -185,6 +185,9 @@ export default function App() {
 
   // Toast notification state
   const [toastData, setToastData] = useState<ToastData | null>(null);
+  const handleCloseToast = useCallback(() => {
+    setToastData(null);
+  }, []);
 
   const showToast = (
     msg: string,
@@ -227,6 +230,20 @@ export default function App() {
     });
 
     showToast(`"${product.name}" added to cart!`, product, variation || null, quantity);
+
+    trackGtmEvent('add_to_cart', {
+      currency: 'BDT',
+      value: (variation?.salePrice ?? product.salePrice) * quantity,
+      items: [
+        {
+          item_id: product._id,
+          item_name: product.name,
+          item_variant: variation?.name || undefined,
+          price: variation?.salePrice ?? product.salePrice,
+          quantity,
+        },
+      ],
+    });
   };
 
   const handleQuickBuy = (product: Product, variation?: VariationItem, quantity: number = 1) => {
@@ -400,7 +417,7 @@ export default function App() {
           logoutUser();
           setCurrentUser(null);
           setCurrentView('store');
-          showToast('সফলভাবে লগআউট হয়েছে');
+          showToast('Logged out successfully');
         }}
         onViewProductOnSite={(prod) => {
           setCurrentView('store');
@@ -683,7 +700,7 @@ export default function App() {
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-btn-text rounded-xl border border-slate-200 hover:border-blue-500 transition-all shadow-2xs"
                 >
                   <ArrowLeft className="w-3.5 h-3.5 text-blue-600" />
-                  <span>সকল সেকশনে ফিরে যান (Show All Sections)</span>
+                  <span>Back to All Sections</span>
                 </button>
               </div>
 
@@ -696,19 +713,19 @@ export default function App() {
                   </div>
                   <h2 className="text-xl sm:text-2xl font-main-heading text-[#0F172A]">
                     {searchQuery.trim()
-                      ? `অনুসন্ধান: "${searchQuery}"`
+                      ? `Search: "${searchQuery}"`
                       : activeCategoryObj
                       ? activeCategoryObj.name
                       : activeTag === 'flash'
-                      ? 'ফ্ল্যাশ সেল কালেকশন'
+                      ? 'Flash Sale Collection'
                       : activeTag === 'new'
-                      ? 'নতুন কালেকশন'
+                      ? 'New Arrivals Collection'
                       : activeTag === 'verified'
-                      ? 'ভেরিফাইড একাউন্ট কালেকশন'
-                      : 'সকল ডিজিটাল প্রোডাক্ট ও সাবস্ক্রিপশন'}
+                      ? 'Verified Accounts Collection'
+                      : 'All Digital Products & Subscriptions'}
                   </h2>
                   <p className="text-xs text-slate-500 mt-1 font-body-text">
-                    {filteredProducts.length}টি অফিশিয়াল ও জেনুইন সার্ভিস পাওয়া গেছে
+                    {filteredProducts.length} official & genuine products available
                   </p>
                 </div>
 
@@ -724,7 +741,7 @@ export default function App() {
                           : 'text-slate-600 hover:text-blue-600'
                       }`}
                     >
-                      সবগুলো
+                      All Products
                     </button>
 
                     <button
@@ -736,7 +753,7 @@ export default function App() {
                       }`}
                     >
                       <Flame className={`w-3.5 h-3.5 fill-current ${activeTag === 'flash' ? 'text-amber-300' : 'text-amber-500'}`} />
-                      <span>ফ্ল্যাশ সেল</span>
+                      <span>Flash Sale</span>
                     </button>
 
                     <button
@@ -748,7 +765,7 @@ export default function App() {
                       }`}
                     >
                       <Zap className={`w-3.5 h-3.5 fill-current ${activeTag === 'new' ? 'text-blue-200' : 'text-blue-500'}`} />
-                      <span>নতুন কালেকশন</span>
+                      <span>New Arrivals</span>
                     </button>
 
                     <button
@@ -760,7 +777,7 @@ export default function App() {
                       }`}
                     >
                       <Shield className={`w-3.5 h-3.5 ${activeTag === 'verified' ? 'text-emerald-200' : 'text-emerald-500'}`} />
-                      <span>ভেরিফাইড একাউন্ট</span>
+                      <span>Verified Accounts</span>
                     </button>
                   </div>
 
@@ -773,10 +790,10 @@ export default function App() {
                       onChange={(e) => setSortBy(e.target.value as any)}
                       className="pl-8 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-xs font-body-text font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs cursor-pointer"
                     >
-                      <option value="featured">জনপ্রিয় (Featured)</option>
-                      <option value="price-low">দাম: কম থেকে বেশি</option>
-                      <option value="price-high">দাম: বেশি থেকে কম</option>
-                      <option value="name">নাম (A-Z)</option>
+                      <option value="featured">Featured / Popular</option>
+                      <option value="price-low">Price: Low to High</option>
+                      <option value="price-high">Price: High to Low</option>
+                      <option value="name">Name (A-Z)</option>
                     </select>
                   </div>
                 </div>
@@ -801,10 +818,10 @@ export default function App() {
                     <RefreshCw className="w-6 h-6" />
                   </div>
                   <h3 className="text-base font-sub-heading text-slate-800">
-                    কোনো প্রোডাক্ট খুঁজে পাওয়া যায়নি
+                    No products found
                   </h3>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto font-body-text">
-                    আপনার খোঁজা ক্যাটাগরি বা ফিল্টারে বর্তমানে কোনো প্রোডাক্ট নেই। অন্য ফিল্টার নির্বাচন করুন।
+                    There are currently no products matching your selected category or filter. Try a different filter.
                   </p>
                   <button
                     onClick={() => {
@@ -814,7 +831,7 @@ export default function App() {
                     }}
                     className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-btn-text rounded-xl transition-colors"
                   >
-                    সব প্রোডাক্ট দেখুন
+                    View All Products
                   </button>
                 </div>
               )}
@@ -919,7 +936,7 @@ export default function App() {
         onUserChange={(user) => {
           setCurrentUser(user);
           if (user) {
-            showToast(`স্বাগতম, ${user.name}!`);
+            showToast(`Welcome back, ${user.name}!`);
             if (user.role === 'admin') {
               setCurrentView('admin');
               setIsAuthModalOpen(false);
@@ -943,7 +960,7 @@ export default function App() {
       {/* Global Interactive Add-to-Cart Toast Notification */}
       <ToastNotification
         toast={toastData}
-        onClose={() => setToastData(null)}
+        onClose={handleCloseToast}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenCheckout={() => setIsCheckoutOpen(true)}
       />

@@ -468,7 +468,7 @@ export const Footer: React.FC<FooterProps> = ({ onSelectPolicy }) => {
                 </h3>
                 {currentPage?.lastUpdated && (
                   <span className="text-[11px] text-slate-400 font-medium">
-                    সর্বশেষ আপডেট: {currentPage.lastUpdated}
+                    Last Updated: {currentPage.lastUpdated}
                   </span>
                 )}
               </div>

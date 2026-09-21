@@ -261,11 +261,11 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
     setTopUpMsg(null);
     const amt = parseFloat(topUpAmount);
     if (isNaN(amt) || amt < 50) {
-      setTopUpMsg({ type: 'error', text: 'সর্বনিম্ন টপ-আপ ৫০ টাকা।' });
+      setTopUpMsg({ type: 'error', text: 'Minimum top-up amount is ৳50.' });
       return;
     }
     if (!topUpTrxId.trim()) {
-      setTopUpMsg({ type: 'error', text: 'অনুগ্রহ করে ট্রানজেকশন আইডি (TrxID) দিন।' });
+      setTopUpMsg({ type: 'error', text: 'Please enter transaction ID (TrxID).' });
       return;
     }
 
@@ -305,7 +305,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
     });
     if (res.success && res.user) {
       onUserChange(res.user);
-      setProfileMsg('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
+      setProfileMsg('Profile updated successfully!');
       setTimeout(() => setProfileMsg(null), 2500);
     } else {
       setProfileMsg(res.message);
@@ -357,13 +357,13 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
               onClick={() => setActiveTab('dashboard')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-all duration-150 ${
                 activeTab === 'dashboard'
-                  ? 'bg-[#FFF5ED] text-[#FF6B00] font-bold shadow-2xs'
+                  ? 'bg-blue-50 text-[#0052FF] font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
               }`}
             >
               <LayoutDashboard
                 className={`w-4 h-4 ${
-                  activeTab === 'dashboard' ? 'text-[#FF6B00]' : 'text-slate-400'
+                  activeTab === 'dashboard' ? 'text-[#0052FF]' : 'text-slate-400'
                 }`}
               />
               <span>Dashboard</span>
@@ -375,14 +375,14 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
               onClick={() => setActiveTab('orders')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-all duration-150 ${
                 activeTab === 'orders'
-                  ? 'bg-[#FFF5ED] text-[#FF6B00] font-bold shadow-2xs'
+                  ? 'bg-blue-50 text-[#0052FF] font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
               }`}
             >
               <div className="flex items-center gap-3">
                 <Package
                   className={`w-4 h-4 ${
-                    activeTab === 'orders' ? 'text-[#FF6B00]' : 'text-slate-400'
+                    activeTab === 'orders' ? 'text-[#0052FF]' : 'text-slate-400'
                   }`}
                 />
                 <span>My Orders</span>
@@ -400,13 +400,13 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
               onClick={() => setActiveTab('notifications')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-all duration-150 ${
                 activeTab === 'notifications'
-                  ? 'bg-[#FFF5ED] text-[#FF6B00] font-bold shadow-2xs'
+                  ? 'bg-blue-50 text-[#0052FF] font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
               }`}
             >
               <Bell
                 className={`w-4 h-4 ${
-                  activeTab === 'notifications' ? 'text-[#FF6B00]' : 'text-slate-400'
+                  activeTab === 'notifications' ? 'text-[#0052FF]' : 'text-slate-400'
                 }`}
               />
               <span>Notifications</span>
@@ -418,14 +418,14 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
               onClick={() => setActiveTab('wallet')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-all duration-150 ${
                 activeTab === 'wallet'
-                  ? 'bg-[#FFF5ED] text-[#FF6B00] font-bold shadow-2xs'
+                  ? 'bg-blue-50 text-[#0052FF] font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
               }`}
             >
               <div className="flex items-center gap-3">
                 <Wallet
                   className={`w-4 h-4 ${
-                    activeTab === 'wallet' ? 'text-[#FF6B00]' : 'text-slate-400'
+                    activeTab === 'wallet' ? 'text-[#0052FF]' : 'text-slate-400'
                   }`}
                 />
                 <span>Wallet</span>
@@ -441,13 +441,13 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
               onClick={() => setActiveTab('refer')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-all duration-150 ${
                 activeTab === 'refer'
-                  ? 'bg-[#FFF5ED] text-[#FF6B00] font-bold shadow-2xs'
+                  ? 'bg-blue-50 text-[#0052FF] font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
               }`}
             >
               <Gift
                 className={`w-4 h-4 ${
-                  activeTab === 'refer' ? 'text-[#FF6B00]' : 'text-slate-400'
+                  activeTab === 'refer' ? 'text-[#0052FF]' : 'text-slate-400'
                 }`}
               />
               <span>Refer & Earn</span>
@@ -457,18 +457,18 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
             <button
               id="dash-tab-affiliate"
               onClick={() => setActiveTab('affiliate')}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm transition-all duration-150 ${
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-all duration-150 ${
                 activeTab === 'affiliate'
-                  ? 'bg-[#FFEDE1] text-[#FF6B00] font-semibold shadow-2xs'
+                  ? 'bg-blue-50 text-[#0052FF] font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
               }`}
             >
               {activeTab === 'affiliate' ? (
-                <div className="w-6 h-6 rounded-full bg-[#FF6B00] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                <div className="w-5 h-5 rounded-full bg-[#0052FF] text-white flex items-center justify-center text-[11px] font-bold shrink-0">
                   $
                 </div>
               ) : (
-                <div className="w-6 h-6 flex items-center justify-center text-slate-400 shrink-0">
+                <div className="w-5 h-5 flex items-center justify-center text-slate-400 shrink-0">
                   <Coins className="w-4 h-4" />
                 </div>
               )}
@@ -481,13 +481,13 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
               onClick={() => setActiveTab('bind-referrer')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-all duration-150 ${
                 activeTab === 'bind-referrer'
-                  ? 'bg-[#FFF5ED] text-[#FF6B00] font-bold shadow-2xs'
+                  ? 'bg-blue-50 text-[#0052FF] font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
               }`}
             >
               <Link2
                 className={`w-4 h-4 ${
-                  activeTab === 'bind-referrer' ? 'text-[#FF6B00]' : 'text-slate-400'
+                  activeTab === 'bind-referrer' ? 'text-[#0052FF]' : 'text-slate-400'
                 }`}
               />
               <span>Bind Referrer</span>
@@ -499,13 +499,13 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
               onClick={() => setActiveTab('profile')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-all duration-150 ${
                 activeTab === 'profile'
-                  ? 'bg-[#FFF5ED] text-[#FF6B00] font-bold shadow-2xs'
+                  ? 'bg-blue-50 text-[#0052FF] font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
               }`}
             >
               <User
                 className={`w-4 h-4 ${
-                  activeTab === 'profile' ? 'text-[#FF6B00]' : 'text-slate-400'
+                  activeTab === 'profile' ? 'text-[#0052FF]' : 'text-slate-400'
                 }`}
               />
               <span>Profile</span>
@@ -527,16 +527,16 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
 
           {/* Right Main Content Area */}
           <main className="flex-1 w-full space-y-6">
-            {/* ================= TAB 1: DASHBOARD (Exact Match to Image) ================= */}
+            {/* ================= TAB 1: DASHBOARD ================= */}
             {activeTab === 'dashboard' && (
               <>
-                {/* 1. MY WALLET Sleek Dark Chocolate Banner Matching Reference Image */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#1B1008] via-[#2A150C] to-[#452010] p-6 sm:p-7 text-white shadow-md">
+                {/* 1. MY WALLET Sleek Company Brand Blue Banner */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0B132B] via-[#003BCC] to-[#0052FF] p-6 sm:p-7 text-white shadow-md">
                   {/* Top Bar: Icon + Title on left, "Top up ->" on right */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-amber-200/90" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-amber-100/90">
+                      <CreditCard className="w-4 h-4 text-cyan-200/90" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-cyan-100/90">
                         MY WALLET
                       </span>
                     </div>
@@ -562,12 +562,12 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   </div>
                 </div>
 
-                {/* 2. Four Metric Cards Row Matching Reference Image */}
+                {/* 2. Four Metric Cards Row */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                   {/* Card 1: LIFETIME SPEND */}
                   <div
                     onClick={() => setActiveTab('orders')}
-                    className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100/90 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-orange-200 transition-all cursor-pointer group flex flex-col justify-between"
+                    className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100/90 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-blue-200 transition-all cursor-pointer group flex flex-col justify-between"
                   >
                     <div>
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -577,7 +577,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                         ৳{lifetimeSpend.toLocaleString()}
                       </div>
                     </div>
-                    <div className="text-right mt-3 text-slate-400 group-hover:text-[#FF6B00] group-hover:translate-x-1 transition-all">
+                    <div className="text-right mt-3 text-slate-400 group-hover:text-[#0052FF] group-hover:translate-x-1 transition-all">
                       <ArrowRight className="w-4 h-4 ml-auto inline-block" />
                     </div>
                   </div>
@@ -585,7 +585,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   {/* Card 2: ORDERS */}
                   <div
                     onClick={() => setActiveTab('orders')}
-                    className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100/90 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-orange-200 transition-all cursor-pointer group flex flex-col justify-between"
+                    className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100/90 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-blue-200 transition-all cursor-pointer group flex flex-col justify-between"
                   >
                     <div>
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -595,7 +595,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                         {orders.length}
                       </div>
                     </div>
-                    <div className="text-right mt-3 text-slate-400 group-hover:text-[#FF6B00] group-hover:translate-x-1 transition-all">
+                    <div className="text-right mt-3 text-slate-400 group-hover:text-[#0052FF] group-hover:translate-x-1 transition-all">
                       <ArrowRight className="w-4 h-4 ml-auto inline-block" />
                     </div>
                   </div>
@@ -603,7 +603,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   {/* Card 3: DELIVERED */}
                   <div
                     onClick={() => setActiveTab('orders')}
-                    className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100/90 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-orange-200 transition-all cursor-pointer group flex flex-col justify-between"
+                    className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100/90 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-blue-200 transition-all cursor-pointer group flex flex-col justify-between"
                   >
                     <div>
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -613,7 +613,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                         {deliveredCount}
                       </div>
                     </div>
-                    <div className="text-right mt-3 text-slate-400 group-hover:text-[#FF6B00] group-hover:translate-x-1 transition-all">
+                    <div className="text-right mt-3 text-slate-400 group-hover:text-[#0052FF] group-hover:translate-x-1 transition-all">
                       <ArrowRight className="w-4 h-4 ml-auto inline-block" />
                     </div>
                   </div>
@@ -621,7 +621,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   {/* Card 4: PENDING */}
                   <div
                     onClick={() => setActiveTab('orders')}
-                    className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100/90 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-orange-200 transition-all cursor-pointer group flex flex-col justify-between"
+                    className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100/90 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-blue-200 transition-all cursor-pointer group flex flex-col justify-between"
                   >
                     <div>
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -631,13 +631,13 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                         {pendingCount}
                       </div>
                     </div>
-                    <div className="text-right mt-3 text-slate-400 group-hover:text-[#FF6B00] group-hover:translate-x-1 transition-all">
+                    <div className="text-right mt-3 text-slate-400 group-hover:text-[#0052FF] group-hover:translate-x-1 transition-all">
                       <ArrowRight className="w-4 h-4 ml-auto inline-block" />
                     </div>
                   </div>
                 </div>
 
-                {/* 3. Recent Orders Section Matching Reference Image */}
+                {/* 3. Recent Orders Section */}
                 <div className="bg-white rounded-2xl border border-slate-100/90 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 sm:p-6">
                   <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                     <h2 className="text-sm sm:text-base font-bold text-slate-900 font-main-heading">
@@ -645,7 +645,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                     </h2>
                     <button
                       onClick={() => setActiveTab('orders')}
-                      className="text-xs sm:text-sm font-semibold text-[#FF6B00] hover:text-[#E05E00] flex items-center gap-1 transition-colors"
+                      className="text-xs sm:text-sm font-semibold text-[#0052FF] hover:text-blue-700 flex items-center gap-1 transition-colors"
                     >
                       <span>View all</span>
                       <ArrowRight className="w-3.5 h-3.5" />
@@ -663,7 +663,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                       </p>
                       <button
                         onClick={onBrowseProducts}
-                        className="text-xs sm:text-sm font-bold text-[#FF6B00] hover:underline mt-1.5 inline-flex items-center gap-1"
+                        className="text-xs sm:text-sm font-bold text-[#0052FF] hover:underline mt-1.5 inline-flex items-center gap-1"
                       >
                         <span>Browse products</span>
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -710,7 +710,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                             </span>
                             <button
                               onClick={() => setSelectedOrder(ord)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-[#FF6B00] hover:text-white text-slate-700 transition-colors"
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-[#0052FF] hover:text-white text-slate-700 transition-colors"
                             >
                               Details
                             </button>
@@ -737,7 +737,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   </div>
                   <button
                     onClick={onBrowseProducts}
-                    className="px-3 py-1.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white text-xs font-bold rounded-xl shadow-xs transition-all"
+                    className="px-3 py-1.5 bg-[#0052FF] hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all"
                   >
                     + New Order
                   </button>
@@ -752,7 +752,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                     </p>
                     <button
                       onClick={onBrowseProducts}
-                      className="mt-4 px-4 py-2 bg-[#FF6B00] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#E05E00] transition-colors"
+                      className="mt-4 px-4 py-2 bg-[#0052FF] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-blue-700 transition-colors"
                     >
                       Browse Digital Products
                     </button>
@@ -886,14 +886,14 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
             {activeTab === 'wallet' && (
               <div className="space-y-5">
                 {/* Big Wallet Card */}
-                <div className="rounded-2xl bg-gradient-to-r from-[#1B1008] via-[#2A150C] to-[#452010] p-6 sm:p-7 text-white shadow-md">
+                <div className="rounded-2xl bg-gradient-to-r from-[#0B132B] via-[#003BCC] to-[#0052FF] p-6 sm:p-7 text-white shadow-md">
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-bold uppercase tracking-wider text-amber-200">
+                    <span className="text-xs font-bold uppercase tracking-wider text-cyan-200">
                       DSP Digital Wallet
                     </span>
                     <button
                       onClick={() => setIsTopUpOpen(true)}
-                      className="px-4 py-1.5 bg-white text-[#1B1008] hover:bg-amber-50 text-xs font-bold rounded-full transition-all flex items-center gap-1 shadow-sm"
+                      className="px-4 py-1.5 bg-white text-[#0052FF] hover:bg-blue-50 text-xs font-bold rounded-full transition-all flex items-center gap-1 shadow-sm"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Money / Top Up</span>
@@ -949,15 +949,15 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   </p>
                 </div>
 
-                <div className="p-4 bg-orange-50/60 border border-orange-100 rounded-2xl space-y-2">
-                  <span className="text-xs font-bold text-orange-900 uppercase">Your Referral Code</span>
+                <div className="p-4 bg-blue-50/60 border border-blue-100 rounded-2xl space-y-2">
+                  <span className="text-xs font-bold text-blue-900 uppercase">Your Referral Code</span>
                   <div className="flex items-center gap-3">
-                    <span className="px-4 py-2 bg-white rounded-xl font-mono text-base font-bold text-[#FF6B00] border border-orange-200">
+                    <span className="px-4 py-2 bg-white rounded-xl font-mono text-base font-bold text-[#0052FF] border border-blue-200">
                       {currentUser.referralCode || 'DSP1001'}
                     </span>
                     <button
                       onClick={handleCopyReferral}
-                      className="px-4 py-2 bg-[#FF6B00] hover:bg-[#E05E00] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs transition-colors"
+                      className="px-4 py-2 bg-[#0052FF] hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs transition-colors"
                     >
                       <Copy className="w-3.5 h-3.5" />
                       <span>{copiedRef ? 'Link Copied!' : 'Copy Share Link'}</span>
@@ -1139,14 +1139,14 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                     {/* Row 5: NID / ID Number */}
                     <div className="mb-4 sm:mb-5">
                       <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-2">
-                        National ID (NID) / Passport / Student ID Number (পরিচয়পত্র নম্বর)
+                        National ID (NID) / Passport / Student ID Number
                       </label>
                       <input
                         type="text"
                         name="nidNumber"
                         value={affiliateForm.nidNumber}
                         onChange={handleAffiliateChange}
-                        placeholder="যেমন: 19954817293847"
+                        placeholder="e.g. 19954817293847"
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 transition-all bg-white"
                       />
                     </div>
@@ -1154,10 +1154,10 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                     {/* Row 6: Document Verification Upload */}
                     <div className="mb-6 sm:mb-8">
                       <label className="block text-xs sm:text-[13px] font-medium text-slate-700 mb-1.5">
-                        Upload ID / Verification Document (NID, পাসপোর্ট, ট্রেড লাইসেন্স বা স্টুডেন্ট আইডি কার্ডের ছবি)
+                        Upload ID / Verification Document (NID, Passport, Trade License or Student ID card)
                       </label>
                       <p className="text-[11px] text-slate-500 mb-2.5">
-                        অ্যাডমিন প্যানেলে আপনার ডকুমেন্ট যাচাই ও অ্যাপ্রুভালের জন্য পরিষ্কার ছবি বা ডকুমেন্ট আপলোড করুন (সর্বোচ্চ ৫ MB)
+                        Upload a clear photo or document for administrative verification and approval (Max 5 MB)
                       </p>
 
                       {affiliateForm.documentUrl ? (
@@ -1205,20 +1205,20 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                             <Upload className="w-5 h-5" />
                           </div>
                           <span className="text-xs font-bold text-slate-700 group-hover:text-[#0052FF]">
-                            ডকুমেন্ট বা NID কার্ডের ছবি নির্বাচন করুন
+                            Select verification document or ID photo
                           </span>
                           <span className="text-[11px] text-slate-400 mt-0.5">
-                            PNG, JPG, JPEG বা PDF (Max 5MB)
+                            PNG, JPG, JPEG or PDF (Max 5MB)
                           </span>
                         </label>
                       )}
                     </div>
 
-                    {/* Submit button: matching peach/coral style in reference image */}
+                    {/* Submit button: styled with company brand blue */}
                     <button
                       type="submit"
                       disabled={submittingAffiliate}
-                      className="px-7 py-3 rounded-2xl sm:rounded-full bg-[#FFB088] hover:bg-[#FFA072] active:scale-[0.98] text-white text-sm font-semibold transition-all shadow-2xs disabled:opacity-60 flex items-center justify-center gap-2"
+                      className="px-7 py-3 rounded-2xl sm:rounded-full bg-[#0052FF] hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-semibold transition-all shadow-xs disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <span>{submittingAffiliate ? 'Submitting...' : 'Submit application'}</span>
                     </button>
@@ -1267,13 +1267,13 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                         value={referrerCodeInput}
                         onChange={(e) => setReferrerCodeInput(e.target.value)}
                         placeholder="e.g. TAN1024"
-                        className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm uppercase font-mono focus:outline-none focus:border-[#FF6B00]"
+                        className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm uppercase font-mono focus:outline-none focus:border-[#0052FF]"
                       />
                     </div>
 
                     <button
                       type="submit"
-                      className="px-5 py-2 bg-[#FF6B00] hover:bg-[#E05E00] text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+                      className="px-5 py-2 bg-[#0052FF] hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
                     >
                       Bind Code
                     </button>
@@ -1311,7 +1311,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-tr from-[#FF6B00] to-[#FFA048] flex items-center justify-center text-white text-xl font-bold">
+                        <div className="w-full h-full bg-gradient-to-tr from-[#0052FF] to-[#00DFBA] flex items-center justify-center text-white text-xl font-bold">
                           {currentUser.name.charAt(0).toUpperCase()}
                         </div>
                       )}
@@ -1319,15 +1319,15 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   </div>
                   <div className="space-y-1.5 flex-1">
                     <div className="text-xs font-bold text-slate-800">
-                      Profile Picture (কাস্টম ছবি)
+                      Profile Picture
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      আপনার প্রোফাইলে যে ছবিটা আপলোড করবেন সেটি ওয়েবসাইটে এবং অ্যাকাউন্টে সেভ থাকবে।
+                      The photo you upload will be saved to your profile and displayed across your account.
                     </p>
                     <div className="flex items-center gap-2 pt-1">
                       <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs transition-colors">
-                        <Camera className="w-3.5 h-3.5 text-[#FF6B00]" />
-                        <span>ছবি আপলোড করুন</span>
+                        <Camera className="w-3.5 h-3.5 text-[#0052FF]" />
+                        <span>Upload Photo</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -1336,7 +1336,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                             const file = e.target.files?.[0];
                             if (!file) return;
                             if (file.size > 2 * 1024 * 1024) {
-                              alert('ছবির সাইজ ২MB এর কম হতে হবে');
+                              alert('Image size must be less than 2MB');
                               return;
                             }
                             const reader = new FileReader();
@@ -1344,7 +1344,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                               const base64 = reader.result as string;
                               updateUserAvatar(currentUser.id, base64);
                               onUserChange({ ...currentUser, avatar: base64 });
-                              setProfileMsg('প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে!');
+                              setProfileMsg('Profile picture updated successfully!');
                               setTimeout(() => setProfileMsg(null), 2500);
                             };
                             reader.readAsDataURL(file);
@@ -1358,12 +1358,12 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                           onClick={() => {
                             updateUserAvatar(currentUser.id, '');
                             onUserChange({ ...currentUser, avatar: undefined });
-                            setProfileMsg('প্রোফাইল ছবি সরানো হয়েছে।');
+                            setProfileMsg('Profile picture removed.');
                             setTimeout(() => setProfileMsg(null), 2500);
                           }}
                           className="px-2.5 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-[11px] font-semibold transition-colors"
                         >
-                          ছবি মুছুন
+                          Remove Photo
                         </button>
                       )}
                     </div>
@@ -1380,7 +1380,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                       value={profileName}
                       onChange={(e) => setProfileName(e.target.value)}
                       required
-                      className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#FF6B00]"
+                      className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#0052FF]"
                     />
                   </div>
 
@@ -1393,7 +1393,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                       value={profilePhone}
                       onChange={(e) => setProfilePhone(e.target.value)}
                       required
-                      className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#FF6B00]"
+                      className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#0052FF]"
                     />
                   </div>
 
@@ -1411,7 +1411,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
 
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+                    className="px-5 py-2.5 bg-[#0052FF] hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
                   >
                     Save Changes
                   </button>
@@ -1434,7 +1434,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
             </button>
 
             <h3 className="text-base font-bold text-slate-900 font-main-heading">
-              Wallet Top Up (ব্যালেন্স যোগ করুন)
+              Wallet Top Up
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Send money via bKash, Nagad or Rocket to add balance to your account.
@@ -1466,7 +1466,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                       onClick={() => setTopUpMethod(m)}
                       className={`py-2 px-3 rounded-xl border text-xs font-bold uppercase transition-all ${
                         topUpMethod === m
-                          ? 'border-[#FF6B00] bg-orange-50 text-[#FF6B00] shadow-2xs'
+                          ? 'border-[#0052FF] bg-blue-50 text-[#0052FF] shadow-2xs'
                           : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                       }`}
                     >
@@ -1503,7 +1503,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   onChange={(e) => setTopUpAmount(e.target.value)}
                   min="50"
                   required
-                  className="w-full mt-2 px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#FF6B00]"
+                  className="w-full mt-2 px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#0052FF]"
                 />
               </div>
 
@@ -1514,7 +1514,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   <strong className="text-slate-900 font-mono text-sm">{SHOP_INFO.whatsappNumber}</strong>
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  টাকা পাঠিয়ে নিচের বক্সে ট্রানজেকশন আইডি দিন।
+                  Send payment and enter the transaction ID (TrxID) in the box below.
                 </p>
               </div>
 
@@ -1529,13 +1529,13 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                   onChange={(e) => setTopUpTrxId(e.target.value)}
                   placeholder="e.g. 9J87X1K2P"
                   required
-                  className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono uppercase focus:outline-none focus:border-[#FF6B00]"
+                  className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono uppercase focus:outline-none focus:border-[#0052FF]"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-colors"
+                className="w-full py-2.5 bg-[#0052FF] hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-colors"
               >
                 Confirm Top Up (৳{topUpAmount})
               </button>

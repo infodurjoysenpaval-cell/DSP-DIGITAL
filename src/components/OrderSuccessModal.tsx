@@ -64,38 +64,38 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ order, onC
 
         <div>
           <h2 className="text-xl sm:text-2xl font-main-heading text-slate-900">
-            ধন্যবাদ! আপনার অর্ডার সফল হয়েছে
+            Thank you! Your order was placed successfully
           </h2>
           <p className="text-xs sm:text-sm font-body-text text-slate-500 mt-1">
-            অর্ডার আইডি: <span className="font-mono font-price-text text-blue-600">#{order.orderId}</span>
+            Order ID: <span className="font-mono font-price-text text-blue-600">#{order.orderId}</span>
           </p>
         </div>
 
         {/* Info card */}
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left space-y-2 text-xs text-slate-700 font-body-text">
           <div className="flex justify-between border-b border-slate-200/70 pb-2">
-            <span className="text-slate-500">গ্রাহক:</span>
+            <span className="text-slate-500">Customer:</span>
             <span className="font-semibold text-slate-900">{order.customerName}</span>
           </div>
           <div className="flex justify-between border-b border-slate-200/70 pb-2">
-            <span className="text-slate-500">মোবাইল:</span>
+            <span className="text-slate-500">Phone:</span>
             <span className="font-semibold text-slate-900">{order.phone}</span>
           </div>
           <div className="flex justify-between border-b border-slate-200/70 pb-2">
-            <span className="text-slate-500">ডেলিভারি ইমেইল:</span>
+            <span className="text-slate-500">Delivery Email:</span>
             <span className="font-semibold text-slate-900">{order.email}</span>
           </div>
           <div className="flex justify-between pt-1 text-sm font-sub-heading">
-            <span>সর্বমোট পরিশোধযোগ্য:</span>
+            <span>Total Payable:</span>
             <span className="text-blue-700 font-price-text">৳{order.totalAmount.toLocaleString()}</span>
           </div>
         </div>
 
         {/* Instant WhatsApp notification recommendation */}
         <div className="p-3.5 bg-emerald-50 border border-emerald-200/80 rounded-2xl text-xs text-emerald-800 space-y-1">
-          <p className="font-sub-heading">⚡ দ্রুততম ডেলিভারির জন্য:</p>
+          <p className="font-sub-heading">⚡ For Fastest Delivery:</p>
           <p className="text-[11px] leading-relaxed font-body-text">
-            নিচের বাটনে ক্লিক করে সরাসরি আমাদের অফিশিয়াল হোয়াটসঅ্যাপে অর্ডারের কপি পাঠান। সাথে সাথে আপনার লাইসেন্স প্রদান করা হবে।
+            Click the button below to send your order copy directly to our official WhatsApp. Your license key / invitation will be dispatched immediately.
           </p>
         </div>
 
@@ -109,7 +109,7 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ order, onC
             className="w-full py-3.5 bg-[#25D366] hover:bg-[#20ba59] text-white font-btn-text text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
           >
             <MessageCircle className="w-5 h-5 fill-current" />
-            <span>হোয়াটসঅ্যাপে পাঠিয়ে ডেলিভারি নিন</span>
+            <span>Send Order via WhatsApp for Instant Delivery</span>
           </a>
 
           <div className="grid grid-cols-2 gap-2">
@@ -118,21 +118,21 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ order, onC
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-btn-text rounded-xl transition-colors flex items-center justify-center gap-1.5"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-              <span>{copied ? 'কপি হয়েছে' : 'রসিদ কপি'}</span>
+              <span>{copied ? 'Copied' : 'Copy Receipt'}</span>
             </button>
 
             <button
               onClick={onClose}
               className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-btn-text rounded-xl transition-colors flex items-center justify-center gap-1.5"
             >
-              <span>হোমপেজে ফিরুন</span>
+              <span>Back to Store</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 
           {onViewOrders && (
             <p className="text-[11px] text-slate-500 pt-1 font-body-text">
-              অর্ডারটি একাউন্ট হিস্টোরিতে সংরক্ষিত রয়েছে।{' '}
+              This order has been saved to your account history.{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -141,7 +141,7 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ order, onC
                 }}
                 className="text-blue-600 hover:text-blue-800 font-btn-text underline ml-1"
               >
-                আমার অর্ডারসমূহ দেখুন →
+                View My Orders →
               </button>
             </p>
           )}

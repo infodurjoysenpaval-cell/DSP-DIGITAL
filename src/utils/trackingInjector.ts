@@ -30,48 +30,58 @@ export const initTrackingScripts = () => {
     }
 
     // 2. Google Tag Manager & GA4
+    const staticGtmScript = document.getElementById('gtm-script');
     const existingGtmHead = document.getElementById('dsp-gtm-head');
     if (existingGtmHead) existingGtmHead.remove();
     const existingGtmBody = document.getElementById('dsp-gtm-body');
     if (existingGtmBody) existingGtmBody.remove();
 
     if (settings.tagManager?.enabled) {
-      // Enhanced eCommerce dataLayer init
+      // Ensure dataLayer is initialized
+      (window as any).dataLayer = (window as any).dataLayer || [];
+
       if (settings.tagManager.ecommerceDataLayer) {
-        (window as any).dataLayer = (window as any).dataLayer || [];
         (window as any).dataLayer.push({
           event: 'dsp_store_init',
           currency: settings.shopCurrency || 'BDT',
         });
       }
 
-      if (settings.tagManager.headScript && settings.tagManager.headScript.trim()) {
-        const container = document.createElement('div');
-        container.id = 'dsp-gtm-head';
-        container.innerHTML = settings.tagManager.headScript;
-        const scripts = container.querySelectorAll('script');
-        scripts.forEach((oldScript) => {
-          const newScript = document.createElement('script');
-          Array.from(oldScript.attributes).forEach((attr) => newScript.setAttribute(attr.name, attr.value));
-          newScript.textContent = oldScript.textContent;
-          document.head.appendChild(newScript);
-        });
-      } else if (settings.tagManager.gtmId && settings.tagManager.gtmId.trim()) {
-        const script = document.createElement('script');
-        script.id = 'dsp-gtm-head';
-        script.textContent = `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+      const activeGtmId = settings.tagManager.gtmId?.trim() || 'GTM-TMMCPB3C';
+
+      // Check if index.html already has this exact GTM container running
+      const isAlreadyInHtml = staticGtmScript && staticGtmScript.textContent?.includes(activeGtmId);
+
+      // If not already in index.html, or if admin provided custom head script
+      if (!isAlreadyInHtml) {
+        if (settings.tagManager.headScript && settings.tagManager.headScript.trim()) {
+          const container = document.createElement('div');
+          container.id = 'dsp-gtm-head';
+          container.innerHTML = settings.tagManager.headScript;
+          const scripts = container.querySelectorAll('script');
+          scripts.forEach((oldScript) => {
+            const newScript = document.createElement('script');
+            Array.from(oldScript.attributes).forEach((attr) => newScript.setAttribute(attr.name, attr.value));
+            newScript.textContent = oldScript.textContent;
+            document.head.appendChild(newScript);
+          });
+        } else if (activeGtmId) {
+          const script = document.createElement('script');
+          script.id = 'dsp-gtm-head';
+          script.textContent = `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','${settings.tagManager.gtmId.trim()}');`;
-        document.head.appendChild(script);
-      }
+})(window,document,'script','dataLayer','${activeGtmId}');`;
+          document.head.appendChild(script);
+        }
 
-      if (settings.tagManager.bodyNoScript && settings.tagManager.bodyNoScript.trim()) {
-        const noscriptWrapper = document.createElement('div');
-        noscriptWrapper.id = 'dsp-gtm-body';
-        noscriptWrapper.innerHTML = settings.tagManager.bodyNoScript;
-        document.body.appendChild(noscriptWrapper);
+        if (settings.tagManager.bodyNoScript && settings.tagManager.bodyNoScript.trim()) {
+          const noscriptWrapper = document.createElement('div');
+          noscriptWrapper.id = 'dsp-gtm-body';
+          noscriptWrapper.innerHTML = settings.tagManager.bodyNoScript;
+          document.body.appendChild(noscriptWrapper);
+        }
       }
     }
 
@@ -210,3 +220,19 @@ export const trackMetaEvent = async (
     }
   }
 };
+
+/**
+ * Triggers Google Tag Manager dataLayer event for GA4 / eCommerce tracking
+ */
+export const trackGtmEvent = (
+  eventName: string,
+  eventParams?: Record<string, any>
+) => {
+  if (typeof window === 'undefined') return;
+  (window as any).dataLayer = (window as any).dataLayer || [];
+  (window as any).dataLayer.push({
+    event: eventName,
+    ...eventParams,
+  });
+};
+
