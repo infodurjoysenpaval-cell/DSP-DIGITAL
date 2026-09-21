@@ -57,7 +57,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             <div className="flex items-center gap-2">
               <ShoppingBag className="w-5 h-5 text-blue-600" />
               <h2 className="text-base font-main-heading text-slate-800">
-                শপিং কার্ট ({items.reduce((acc, i) => acc + i.quantity, 0)})
+                Shopping Cart ({items.reduce((acc, i) => acc + i.quantity, 0)})
               </h2>
             </div>
             <button
@@ -76,15 +76,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
                   <ShoppingBag className="w-8 h-8 stroke-[1.5]" />
                 </div>
-                <h4 className="text-base font-sub-heading text-slate-700">আপনার কার্ট খালি রয়েছে</h4>
+                <h4 className="text-base font-sub-heading text-slate-700">Your cart is empty</h4>
                 <p className="text-xs font-body-text text-slate-400 max-w-xs">
-                  পছন্দের ডিজিটাল সেবা ও সাবস্ক্রিপশন কার্টে যোগ করুন এবং এক ক্লিকেই অর্ডার করুন।
+                  Add your favorite digital services & subscriptions to cart and checkout in one click.
                 </p>
                 <button
                   onClick={onClose}
-                  className="mt-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-btn-text text-xs rounded-xl transition-colors"
+                  className="mt-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-btn-text text-xs rounded-xl transition-colors cursor-pointer"
                 >
-                  প্রোডাক্ট দেখুন
+                  Browse Products
                 </button>
               </div>
             ) : (
@@ -109,19 +109,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       </h4>
                       {item.selectedVariation && (
                         <p className="text-[11px] font-body-text text-[#3B82F6] mt-0.5 truncate">
-                          প্ল্যান: {item.selectedVariation.name}
+                          Plan: {item.selectedVariation.name}
                         </p>
                       )}
                       <div className="flex items-center justify-between mt-2">
                         <span className="text-xs font-price-text text-[#0F172A]">
-                          ৳{(itemPrice * item.quantity).toLocaleString()}
+                          Tk {(itemPrice * item.quantity).toLocaleString()}
                         </span>
 
                         {/* Quantity Controls */}
                         <div className="flex items-center border border-[#E2E8F0] rounded-lg overflow-hidden bg-white">
                           <button
                             onClick={() => onUpdateQuantity(index, item.quantity - 1)}
-                            className="px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 font-btn-text"
+                            className="px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 font-btn-text cursor-pointer"
                           >
                             -
                           </button>
@@ -130,7 +130,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                           </span>
                           <button
                             onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                            className="px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 font-btn-text"
+                            className="px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 font-btn-text cursor-pointer"
                           >
                             +
                           </button>
@@ -140,7 +140,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
                     <button
                       onClick={() => onRemoveItem(index)}
-                      className="p-1.5 text-slate-300 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                      className="p-1.5 text-slate-300 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
                       title="Remove item"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -155,12 +155,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           {items.length > 0 && (
             <div className="p-4 sm:p-5 border-t border-[#E2E8F0] bg-[#F8FAFC] space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-body-text text-slate-600">সাবটোটাল:</span>
-                <span className="font-price-text text-lg text-[#0F172A]">৳{subtotal.toLocaleString()}</span>
+                <span className="font-body-text text-slate-600">Subtotal:</span>
+                <span className="font-price-text text-lg text-[#0F172A]">Tk {subtotal.toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between text-xs text-slate-500 font-body-text">
-                <span>ডেলিভারি চার্জ (ডিজিটাল ডেলিভারি):</span>
-                <span className="font-offer-text text-emerald-600">ফ্রি (৳০)</span>
+                <span>Delivery Charge (Digital Delivery):</span>
+                <span className="font-offer-text text-emerald-600">Free (Tk 0)</span>
               </div>
 
               <div className="space-y-2 pt-2">
@@ -170,18 +170,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     onClose();
                     onProceedCheckout();
                   }}
-                  className="w-full py-3 bg-[#3B82F6] hover:bg-[#2563EB] active:scale-[0.98] text-white font-btn-text text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[#3B82F6] hover:bg-[#2563EB] active:scale-[0.98] text-white font-btn-text text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>অর্ডার সম্পন্ন করুন</span>
+                  <span>Proceed to Checkout</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
                 <button
                   onClick={handleWhatsAppCartOrder}
-                  className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-btn-text text-xs rounded-xl border border-emerald-200/80 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-btn-text text-xs rounded-xl border border-emerald-200/80 transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4 text-emerald-600" />
-                  <span>হোয়াটসঅ্যাপে সরাসরি কার্ট অর্ডার পাঠান</span>
+                  <span>Order Directly via WhatsApp</span>
                 </button>
               </div>
             </div>

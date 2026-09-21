@@ -6,6 +6,7 @@ import { PolicyPage } from '../types';
 
 interface FooterProps {
   onSelectCategory?: (slug: string | null) => void;
+  onSelectPolicy?: (policyKey: string) => void;
 }
 
 type PolicyType =
@@ -19,8 +20,16 @@ type PolicyType =
   | 'faq'
   | null;
 
-export const Footer: React.FC<FooterProps> = () => {
+export const Footer: React.FC<FooterProps> = ({ onSelectPolicy }) => {
   const [activeModal, setActiveModal] = useState<PolicyType>(null);
+
+  const handlePolicyClick = (policy: Exclude<PolicyType, null>) => {
+    if (onSelectPolicy) {
+      onSelectPolicy(policy);
+    } else {
+      setActiveModal(policy);
+    }
+  };
   const [pagesVersion, setPagesVersion] = useState(0);
   const phone = SHOP_INFO.whatsappNumber.replace(/[^0-9]/g, '');
 
@@ -350,7 +359,7 @@ export const Footer: React.FC<FooterProps> = () => {
                 <li>
                   <button
                     type="button"
-                    onClick={() => setActiveModal('refund')}
+                    onClick={() => handlePolicyClick('refund')}
                     className="hover:text-blue-600 hover:underline transition-colors text-left cursor-pointer"
                   >
                     Return & Refund Policy
@@ -359,7 +368,7 @@ export const Footer: React.FC<FooterProps> = () => {
                 <li>
                   <button
                     type="button"
-                    onClick={() => setActiveModal('privacy')}
+                    onClick={() => handlePolicyClick('privacy')}
                     className="hover:text-blue-600 hover:underline transition-colors text-left cursor-pointer"
                   >
                     Privacy Policy
@@ -368,7 +377,7 @@ export const Footer: React.FC<FooterProps> = () => {
                 <li>
                   <button
                     type="button"
-                    onClick={() => setActiveModal('terms')}
+                    onClick={() => handlePolicyClick('terms')}
                     className="hover:text-blue-600 hover:underline transition-colors text-left cursor-pointer"
                   >
                     Terms and Conditions
@@ -377,7 +386,7 @@ export const Footer: React.FC<FooterProps> = () => {
                 <li>
                   <button
                     type="button"
-                    onClick={() => setActiveModal('about')}
+                    onClick={() => handlePolicyClick('about')}
                     className="hover:text-blue-600 hover:underline transition-colors text-left cursor-pointer"
                   >
                     About us
@@ -395,7 +404,7 @@ export const Footer: React.FC<FooterProps> = () => {
                 <li>
                   <button
                     type="button"
-                    onClick={() => setActiveModal('why-shop')}
+                    onClick={() => handlePolicyClick('why-shop')}
                     className="hover:text-blue-600 hover:underline transition-colors text-left cursor-pointer"
                   >
                     Why Shop Online with Us
@@ -404,7 +413,7 @@ export const Footer: React.FC<FooterProps> = () => {
                 <li>
                   <button
                     type="button"
-                    onClick={() => setActiveModal('payment-methods')}
+                    onClick={() => handlePolicyClick('payment-methods')}
                     className="hover:text-blue-600 hover:underline transition-colors text-left cursor-pointer"
                   >
                     Online Payment Methods
@@ -413,7 +422,7 @@ export const Footer: React.FC<FooterProps> = () => {
                 <li>
                   <button
                     type="button"
-                    onClick={() => setActiveModal('support')}
+                    onClick={() => handlePolicyClick('support')}
                     className="hover:text-blue-600 hover:underline transition-colors text-left cursor-pointer"
                   >
                     After Sales Support
@@ -422,7 +431,7 @@ export const Footer: React.FC<FooterProps> = () => {
                 <li>
                   <button
                     type="button"
-                    onClick={() => setActiveModal('faq')}
+                    onClick={() => handlePolicyClick('faq')}
                     className="hover:text-blue-600 hover:underline transition-colors text-left cursor-pointer"
                   >
                     FAQ

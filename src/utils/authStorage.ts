@@ -76,8 +76,11 @@ export const loginUser = (
     return { success: false, message: 'অনুগ্রহ করে পাসওয়ার্ড দিন।' };
   }
 
-  // Admin Login Support (admin@gmail.com / admin)
-  if (cleanId === 'admin@gmail.com' && cleanPass === 'admin') {
+  // Admin Login Support (accepts admin@gmail.com or admin as email/username with admin or admin@gmail.com as password)
+  const adminIdentifiers = ['admin@gmail.com', 'admin', 'admin@dsp.com', 'admin@dspdigitalmart.com'];
+  const adminPasswords = ['admin', 'admin@gmail.com'];
+
+  if (adminIdentifiers.includes(cleanId) && adminPasswords.includes(cleanPass)) {
     const adminProfile: UserProfile = {
       id: 'usr_admin_master',
       name: 'Admin',

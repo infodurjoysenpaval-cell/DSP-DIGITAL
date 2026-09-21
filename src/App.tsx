@@ -13,6 +13,8 @@ import { MobileBottomBar } from './components/MobileBottomBar';
 import { AuthAccountModal } from './components/AuthAccountModal';
 import { UserAccountDashboard } from './components/UserAccountDashboard';
 import { CustomerReviewsStats } from './components/CustomerReviewsStats';
+import { PolicyPageView } from './components/PolicyPageView';
+import { ToastNotification, ToastData } from './components/ToastNotification';
 import { PRODUCTS, CATEGORIES, SHOP_INFO } from './data/storeData';
 import { Product, VariationItem, CartItem, OrderDetails, UserProfile } from './types';
 import { getCurrentUser, logoutUser } from './utils/authStorage';
@@ -88,6 +90,7 @@ export default function App() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null);
   const [isAffiliateOpen, setIsAffiliateOpen] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<OrderDetails | null>(null);
 
@@ -158,6 +161,7 @@ export default function App() {
 
   const handleSelectProduct = (product: Product) => {
     setCurrentView('store');
+    setSelectedPolicy(null);
     setSelectedProduct(product);
     window.scrollTo({ top: 0, behavior: 'instant' });
     try {
@@ -170,6 +174,7 @@ export default function App() {
   const handleBackFromProduct = () => {
     setCurrentView('store');
     setSelectedProduct(null);
+    setSelectedPolicy(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     try {
       const url = new URL(window.location.href);
@@ -179,13 +184,22 @@ export default function App() {
   };
 
   // Toast notification state
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastData, setToastData] = useState<ToastData | null>(null);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage((current) => (current === msg ? null : current));
-    }, 2800);
+  const showToast = (
+    msg: string,
+    product?: Product,
+    variation?: VariationItem | null,
+    quantity: number = 1
+  ) => {
+    setToastData({
+      id: Date.now().toString(),
+      message: msg,
+      product,
+      selectedVariation: variation,
+      quantity,
+      type: 'cart',
+    });
   };
 
   // Cart operations
@@ -212,7 +226,7 @@ export default function App() {
       }
     });
 
-    showToast(`"${product.name}" কার্টে যোগ করা হয়েছে!`);
+    showToast(`"${product.name}" added to cart!`, product, variation || null, quantity);
   };
 
   const handleQuickBuy = (product: Product, variation?: VariationItem, quantity: number = 1) => {
@@ -234,7 +248,7 @@ export default function App() {
 
   const handleRemoveItem = (index: number) => {
     setCartItems((prev) => prev.filter((_, i) => i !== index));
-    showToast('আইটেম কার্ট থেকে সরানো হয়েছে');
+    showToast('Item removed from cart');
   };
 
   const handleOrderSuccess = (order: OrderDetails) => {
@@ -398,16 +412,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] pb-16 md:pb-0">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-20 right-4 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-xs font-body-text animate-in slide-in-from-top-2 fade-in">
-          <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
-            <Check className="w-3 h-3 stroke-[3]" />
-          </div>
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* Header */}
       <Header
         cartCount={totalCartCount}
@@ -450,11 +454,20 @@ export default function App() {
             onBrowseProducts={() => {
               setCurrentView('store');
               setSelectedProduct(null);
+              setSelectedPolicy(null);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             initialTab={dashboardTab}
             onOpenAdmin={() => {
               setCurrentView('admin');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        ) : selectedPolicy ? (
+          <PolicyPageView
+            policyKey={selectedPolicy}
+            onBack={() => {
+              setSelectedPolicy(null);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
@@ -816,10 +829,19 @@ export default function App() {
   {currentView !== 'dashboard' && <CustomerReviewsStats />}
 
   {/* Footer */}
-  <Footer onSelectCategory={(slug) => {
-    setCurrentView('store');
-    setSelectedCategory(slug);
-  }} />
+  <Footer
+    onSelectCategory={(slug) => {
+      setCurrentView('store');
+      setSelectedPolicy(null);
+      setSelectedCategory(slug);
+    }}
+    onSelectPolicy={(policyKey) => {
+      setSelectedPolicy(policyKey);
+      setSelectedProduct(null);
+      setCurrentView('store');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }}
+  />
 
   {/* Floating WhatsApp Quick Support */}
   <WhatsAppFloating />
@@ -881,6 +903,12 @@ export default function App() {
           setAuthModalMode(mode || 'login');
           setIsAuthModalOpen(true);
         }}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRemoveItem={handleRemoveItem}
+        onBackToCart={() => {
+          setIsCheckoutOpen(false);
+          setIsCartOpen(true);
+        }}
       />
 
       {/* Customer Authentication & Profile Modal */}
@@ -910,6 +938,14 @@ export default function App() {
         onViewOrders={() => {
           handleOpenDashboard('orders');
         }}
+      />
+
+      {/* Global Interactive Add-to-Cart Toast Notification */}
+      <ToastNotification
+        toast={toastData}
+        onClose={() => setToastData(null)}
+        onOpenCart={() => setIsCartOpen(true)}
+        onOpenCheckout={() => setIsCheckoutOpen(true)}
       />
     </div>
   );

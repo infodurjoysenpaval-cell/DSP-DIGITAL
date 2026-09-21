@@ -192,9 +192,13 @@ export interface PolicyPage {
   id: string;
   key: string;
   title: string;
+  titleBn?: string;
   lastUpdated: string;
   summary?: string;
+  summaryBn?: string;
   content: string;
+  contentBn?: string;
   highlights?: string[];
+  highlightsBn?: string[];
   isPublished: boolean;
 }

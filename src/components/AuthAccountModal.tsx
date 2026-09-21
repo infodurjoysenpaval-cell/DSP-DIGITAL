@@ -103,89 +103,68 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
     setSuccessMsg('');
     setLoading(true);
 
-    const GOOGLE_CLIENT_ID = '357993472629-apps.googleusercontent.com';
+    const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-    const triggerGIS = () => {
-      if (window.google?.accounts?.oauth2) {
-        try {
-          const client = window.google.accounts.oauth2.initTokenClient({
-            client_id: GOOGLE_CLIENT_ID,
-            scope: 'openid profile email',
-            callback: async (resp: any) => {
-              if (resp.error) {
-                setLoading(false);
-                if (resp.error === 'popup_closed_by_user') {
-                  setErrorMsg('গুগল সাইন-ইন উইন্ডোটি বন্ধ করা হয়েছে।');
-                } else {
-                  setShowGoogleChooser(true);
-                }
-                return;
-              }
-
-              if (resp.access_token) {
-                try {
-                  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                    headers: { Authorization: `Bearer ${resp.access_token}` },
-                  });
-                  const gData = await res.json();
-                  if (gData && gData.email) {
-                    const googleUser: UserProfile = {
-                      id: `usr_g_${gData.sub || Date.now()}`,
-                      name: gData.name || gData.given_name || 'Google User',
-                      email: gData.email,
-                      phone: '0171' + Math.floor(1000000 + Math.random() * 9000000),
-                      avatar: gData.picture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
-                      walletBalance: 0,
-                      referralCode: (gData.name || 'DSP').slice(0, 3).toUpperCase() + Math.floor(1000 + Math.random() * 9000),
-                      createdAt: new Date().toISOString(),
-                    };
-
-                    const saved = saveGoogleUser(googleUser);
-                    onUserChange(saved);
-                    setLoading(false);
-                    setSuccessMsg(`DSP DIGITAL MART-এ অফিশিয়াল গুগল অ্যাকাউন্ট (${saved.email}) দিয়ে সফলভাবে লগইন হয়েছে!`);
-                    setTimeout(() => {
-                      onClose();
-                      onOpenDashboard?.(saved);
-                    }, 600);
-                    return;
-                  }
-                } catch (e) {
-                  console.error(e);
-                }
-              }
-
+    // If custom Google Client ID is configured via environment variable, try official GIS
+    if (GOOGLE_CLIENT_ID && window.google?.accounts?.oauth2) {
+      try {
+        const client = window.google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: 'openid profile email',
+          callback: async (resp: any) => {
+            if (resp.error) {
               setLoading(false);
               setShowGoogleChooser(true);
-            },
-          });
-          client.requestAccessToken({ prompt: 'select_account' });
-        } catch (e) {
-          setLoading(false);
-          setShowGoogleChooser(true);
-        }
-      } else {
-        setLoading(false);
-        setShowGoogleChooser(true);
-      }
-    };
+              return;
+            }
 
-    if (!window.google?.accounts?.oauth2) {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        triggerGIS();
-      };
-      script.onerror = () => {
-        setLoading(false);
-        setShowGoogleChooser(true);
-      };
-      document.body.appendChild(script);
-    } else {
-      triggerGIS();
+            if (resp.access_token) {
+              try {
+                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { Authorization: `Bearer ${resp.access_token}` },
+                });
+                const gData = await res.json();
+                if (gData && gData.email) {
+                  const googleUser: UserProfile = {
+                    id: `usr_g_${gData.sub || Date.now()}`,
+                    name: gData.name || gData.given_name || 'Google User',
+                    email: gData.email,
+                    phone: '0171' + Math.floor(1000000 + Math.random() * 9000000),
+                    avatar: gData.picture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+                    walletBalance: 0,
+                    referralCode: (gData.name || 'DSP').slice(0, 3).toUpperCase() + Math.floor(1000 + Math.random() * 9000),
+                    createdAt: new Date().toISOString(),
+                  };
+
+                  const saved = saveGoogleUser(googleUser);
+                  onUserChange(saved);
+                  setLoading(false);
+                  setSuccessMsg(`DSP DIGITAL MART-এ অফিশিয়াল গুগল অ্যাকাউন্ট (${saved.email}) দিয়ে সফলভাবে লগইন হয়েছে!`);
+                  setTimeout(() => {
+                    onClose();
+                    onOpenDashboard?.(saved);
+                  }, 600);
+                  return;
+                }
+              } catch (e) {
+                console.error(e);
+              }
+            }
+
+            setLoading(false);
+            setShowGoogleChooser(true);
+          },
+        });
+        client.requestAccessToken({ prompt: 'select_account' });
+        return;
+      } catch (e) {
+        // Fallback to chooser
+      }
     }
+
+    // Default seamless Google sign-in workflow (directly present account selector)
+    setLoading(false);
+    setShowGoogleChooser(true);
   };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
@@ -479,10 +458,10 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
         {/* ================= SIGN IN FORM ================= */}
         {!showGoogleChooser && mode === 'login' && (
           <form onSubmit={handleLoginSubmit} className="space-y-4">
-            {/* Email */}
+            {/* Email / Username / Phone */}
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                Email
+                Email or Mobile / Username
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -492,7 +471,7 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder="admin@gmail.com or admin"
                   className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
                 />
               </div>
