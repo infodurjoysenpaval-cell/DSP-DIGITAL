@@ -334,14 +334,22 @@ export const Footer: React.FC<FooterProps> = ({ onSelectPolicy }) => {
                     dspdigitalmart@gmail.com
                   </a>
                 </li>
-                <li className="flex items-center gap-2.5">
-                  <Phone className="w-4 h-4 fill-[#2563EB] text-[#2563EB] shrink-0" />
-                  <a
-                    href="tel:+8801712792184"
-                    className="hover:text-blue-600 transition-colors"
-                  >
-                    +8801712792184
-                  </a>
+                <li className="flex items-start gap-2.5">
+                  <Phone className="w-4 h-4 fill-[#2563EB] text-[#2563EB] shrink-0 mt-0.5" />
+                  <div className="flex flex-col space-y-0.5">
+                    <a
+                      href="tel:+8801712792184"
+                      className="hover:text-blue-600 transition-colors"
+                    >
+                      +8801712792184
+                    </a>
+                    <a
+                      href="tel:+8809649141111"
+                      className="hover:text-blue-600 transition-colors"
+                    >
+                      +8809649141111
+                    </a>
+                  </div>
                 </li>
                 <li className="flex items-center gap-2.5">
                   <MapPin className="w-4 h-4 fill-[#2563EB] text-[#2563EB] shrink-0" />
@@ -443,9 +451,12 @@ export const Footer: React.FC<FooterProps> = ({ onSelectPolicy }) => {
           </div>
 
           {/* Bottom Divider Line & Centered Copyright matching reference image */}
-          <div className="w-full border-t border-slate-200 mt-10 pt-4 pb-2 text-center">
-            <p className="text-xs sm:text-[13px] text-slate-500 font-normal">
-              Copyright © 2026 www.dspdigitalmart.com
+          <div className="w-full border-t border-slate-200 mt-10 pt-4 pb-2 text-center space-y-1">
+            <p className="text-xs sm:text-[13px] text-slate-600 font-medium">
+              © 2026 DSP DIGITAL MART. All Rights Reserved.
+            </p>
+            <p className="text-xs text-slate-500 font-normal">
+              Founded &amp; Developed by Durjoy Sen Paval
             </p>
           </div>
         </div>

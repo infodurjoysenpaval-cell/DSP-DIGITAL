@@ -28,6 +28,10 @@ export const SHOP_INFO: ShopInfo = {
     {
       "type": null,
       "value": "+8801712792184"
+    },
+    {
+      "type": null,
+      "value": "+8809649141111"
     }
   ],
   "whatsappNumber": "+8801712792184",
