@@ -164,13 +164,22 @@ export interface StoreSettings {
     syncOrders: boolean;
     enabled: boolean;
   };
+  homepageStats: {
+    ordersDelivered: string;
+    happyCustomers: string;
+    avgDeliveryTime: string;
+    verifiedReviewAvg: string;
+  };
 }
+
+export type VendorRole = 'Owner' | 'Admin' | 'Manager' | 'ProductAdder';
 
 export interface VendorAdmin {
   id: string;
   name: string;
   username: string;
-  role: 'Owner' | 'Admin' | 'Manager';
+  password?: string;
+  role: VendorRole;
   lastLogin: string;
   registeredAt: string;
   access: 'Allowed' | 'Restricted';
@@ -376,6 +385,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     syncOrders: true,
     enabled: true,
   },
+  homepageStats: {
+    ordersDelivered: '48K+',
+    happyCustomers: '12K+',
+    avgDeliveryTime: '~38s',
+    verifiedReviewAvg: '4.9',
+  },
 };
 
 // ---------------- PRODUCTS ----------------
@@ -543,6 +558,7 @@ export const getStoreSettings = (): StoreSettings => {
       rewardPoint: { ...DEFAULT_STORE_SETTINGS.rewardPoint, ...(parsed.rewardPoint || {}) },
       ePBX: { ...DEFAULT_STORE_SETTINGS.ePBX, ...(parsed.ePBX || {}) },
       bizmation: { ...DEFAULT_STORE_SETTINGS.bizmation, ...(parsed.bizmation || {}) },
+      homepageStats: { ...DEFAULT_STORE_SETTINGS.homepageStats, ...(parsed.homepageStats || {}) },
     };
   } catch (e) {
     return DEFAULT_STORE_SETTINGS;

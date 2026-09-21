@@ -5,6 +5,7 @@ import {
   formatRelativeTime,
   RealPurchaseNotification,
 } from '../utils/authStorage';
+import { getStoreSettings } from '../utils/adminStore';
 
 interface Review {
   id: string;
@@ -53,6 +54,35 @@ export const CustomerReviewsStats: React.FC = () => {
   const [purchaseIndex, setPurchaseIndex] = useState(0);
   const [showToast, setShowToast] = useState(false);
 
+  // Live editable stats configured from the Admin Panel
+  const [stats, setStats] = useState(() => {
+    const s = getStoreSettings();
+    return s.homepageStats || {
+      ordersDelivered: '48K+',
+      happyCustomers: '12K+',
+      avgDeliveryTime: '~38s',
+      verifiedReviewAvg: '4.9',
+    };
+  });
+
+  // Sync stats when updated from admin in real time
+  useEffect(() => {
+    const updateStats = () => {
+      const s = getStoreSettings();
+      if (s.homepageStats) {
+        setStats(s.homepageStats);
+      }
+    };
+
+    window.addEventListener('dsp_settings_updated', updateStats);
+    window.addEventListener('storage', updateStats);
+
+    return () => {
+      window.removeEventListener('dsp_settings_updated', updateStats);
+      window.removeEventListener('storage', updateStats);
+    };
+  }, []);
+
   // Sync with actual lifetime orders on mount and when new orders are placed
   useEffect(() => {
     const syncRealOrders = () => {
@@ -95,40 +125,40 @@ export const CustomerReviewsStats: React.FC = () => {
       <div className="bg-[#0F172A] text-white py-10 px-4 border-t border-slate-800">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
-            {/* 48K+ */}
+            {/* Orders Delivered */}
             <div className="space-y-1">
               <h3 className="text-3xl sm:text-4xl font-price-text text-sky-400 tracking-tight">
-                48K+
+                {stats.ordersDelivered || '48K+'}
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 font-body-text">
                 orders delivered
               </p>
             </div>
 
-            {/* 12K+ */}
+            {/* Happy Customers */}
             <div className="space-y-1">
               <h3 className="text-3xl sm:text-4xl font-price-text text-sky-400 tracking-tight">
-                12K+
+                {stats.happyCustomers || '12K+'}
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 font-body-text">
                 happy customers
               </p>
             </div>
 
-            {/* ~38s */}
+            {/* Average Delivery Time */}
             <div className="space-y-1">
               <h3 className="text-3xl sm:text-4xl font-price-text text-sky-400 tracking-tight">
-                ~38s
+                {stats.avgDeliveryTime || '~38s'}
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 font-body-text">
                 avg delivery time
               </p>
             </div>
 
-            {/* 4.9★ */}
+            {/* Verified Review Avg */}
             <div className="space-y-1">
               <div className="flex items-center justify-center gap-1 text-3xl sm:text-4xl font-price-text text-sky-400">
-                <span>4.9</span>
+                <span>{stats.verifiedReviewAvg || '4.9'}</span>
                 <Star className="w-6 h-6 sm:w-7 sm:h-7 fill-current text-amber-400" />
               </div>
               <p className="text-xs sm:text-sm text-slate-300 font-body-text">

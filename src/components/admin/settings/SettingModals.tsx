@@ -2128,6 +2128,170 @@ export const SettingModals: React.FC<SettingModalsProps> = ({
               </div>
             </div>
           )}
+
+          {/* 24. HOMEPAGE STATS & COUNTERS MODAL */}
+          {activeModal === 'homepage-stats' && (
+            <div className="space-y-4">
+              <div className="p-3.5 rounded-xl bg-indigo-50 border border-indigo-100 flex items-start gap-2.5">
+                <BarChart className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-indigo-900">
+                  <p className="font-bold">হোমপেজ পরিসংখ্যান ও কাউন্টার সেটিংস (Live Homepage Stats)</p>
+                  <p className="text-[11px] text-indigo-700 mt-0.5">
+                    এখানে যে সংখ্যাগুলো সেট করবেন, তা সরাসরি হোমপেজের ডার্ক সেকশনে রিয়েল টাইমে প্রদর্শিত হবে।
+                  </p>
+                </div>
+              </div>
+
+              {/* 4 Editable Stat Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 1. Orders Delivered */}
+                <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 space-y-1.5">
+                  <label className="block font-bold text-slate-800">
+                    কতগুলো অর্ডার ডেলিভারি হয়েছে (Orders Delivered) *
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.homepageStats?.ordersDelivered || ''}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homepageStats: {
+                          ...(settings.homepageStats || {
+                            ordersDelivered: '48K+',
+                            happyCustomers: '12K+',
+                            avgDeliveryTime: '~38s',
+                            verifiedReviewAvg: '4.9',
+                          }),
+                          ordersDelivered: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="e.g. 48K+ বা ৫০,০০০+"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white font-bold text-sky-600 focus:outline-none focus:border-[#0052FF]"
+                  />
+                  <p className="text-[10px] text-slate-500">হোমপেজে 'orders delivered' এর উপরে দেখাবে</p>
+                </div>
+
+                {/* 2. Happy Customers */}
+                <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 space-y-1.5">
+                  <label className="block font-bold text-slate-800">
+                    হ্যাপি কাস্টমার (Happy Customers) *
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.homepageStats?.happyCustomers || ''}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homepageStats: {
+                          ...(settings.homepageStats || {
+                            ordersDelivered: '48K+',
+                            happyCustomers: '12K+',
+                            avgDeliveryTime: '~38s',
+                            verifiedReviewAvg: '4.9',
+                          }),
+                          happyCustomers: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="e.g. 12K+ বা ১৫,০০০+"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white font-bold text-sky-600 focus:outline-none focus:border-[#0052FF]"
+                  />
+                  <p className="text-[10px] text-slate-500">হোমপেজে 'happy customers' এর উপরে দেখাবে</p>
+                </div>
+
+                {/* 3. Average Delivery Time */}
+                <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 space-y-1.5">
+                  <label className="block font-bold text-slate-800">
+                    এভারেজ ডেলিভারি টাইম (Avg Delivery Time) *
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.homepageStats?.avgDeliveryTime || ''}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homepageStats: {
+                          ...(settings.homepageStats || {
+                            ordersDelivered: '48K+',
+                            happyCustomers: '12K+',
+                            avgDeliveryTime: '~38s',
+                            verifiedReviewAvg: '4.9',
+                          }),
+                          avgDeliveryTime: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="e.g. ~38s বা ৩০ সেকেন্ড"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white font-bold text-sky-600 focus:outline-none focus:border-[#0052FF]"
+                  />
+                  <p className="text-[10px] text-slate-500">হোমপেজে 'avg delivery time' এর উপরে দেখাবে</p>
+                </div>
+
+                {/* 4. Verified Review Avg */}
+                <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 space-y-1.5">
+                  <label className="block font-bold text-slate-800">
+                    ভেরিফাইড রিভিউ এভিজি (Verified Review Avg) *
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.homepageStats?.verifiedReviewAvg || ''}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homepageStats: {
+                          ...(settings.homepageStats || {
+                            ordersDelivered: '48K+',
+                            happyCustomers: '12K+',
+                            avgDeliveryTime: '~38s',
+                            verifiedReviewAvg: '4.9',
+                          }),
+                          verifiedReviewAvg: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="e.g. 4.9 বা 5.0"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white font-bold text-sky-600 focus:outline-none focus:border-[#0052FF]"
+                  />
+                  <p className="text-[10px] text-slate-500">হোমপেজে 'verified review avg' এর সাথে দেখাবে</p>
+                </div>
+              </div>
+
+              {/* Live Dark Navy Preview */}
+              <div className="mt-4 pt-3 border-t border-slate-100">
+                <label className="block font-bold text-slate-700 mb-2">Live Homepage Preview:</label>
+                <div className="bg-[#0F172A] text-white p-4 sm:p-5 rounded-2xl border border-slate-800">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                    <div className="space-y-0.5">
+                      <h4 className="text-xl sm:text-2xl font-black text-sky-400">
+                        {settings.homepageStats?.ordersDelivered || '48K+'}
+                      </h4>
+                      <p className="text-[11px] text-slate-300">orders delivered</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <h4 className="text-xl sm:text-2xl font-black text-sky-400">
+                        {settings.homepageStats?.happyCustomers || '12K+'}
+                      </h4>
+                      <p className="text-[11px] text-slate-300">happy customers</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <h4 className="text-xl sm:text-2xl font-black text-sky-400">
+                        {settings.homepageStats?.avgDeliveryTime || '~38s'}
+                      </h4>
+                      <p className="text-[11px] text-slate-300">avg delivery time</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center justify-center gap-1 text-xl sm:text-2xl font-black text-sky-400">
+                        <span>{settings.homepageStats?.verifiedReviewAvg || '4.9'}</span>
+                        <span className="text-amber-400">★</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300">verified review avg</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Modal Bottom Footer Actions */}

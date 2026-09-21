@@ -128,6 +128,7 @@ export interface UserProfile {
   email: string;
   phone: string;
   role?: 'admin' | 'customer';
+  adminRole?: 'Owner' | 'Admin' | 'Manager' | 'ProductAdder';
   avatar?: string;
   walletBalance?: number;
   referralCode?: string;

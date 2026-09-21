@@ -87,6 +87,7 @@ export const loginUser = (
       email: 'admin@gmail.com',
       phone: '01712792184',
       role: 'admin',
+      adminRole: 'Owner',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
       walletBalance: 100000,
       referralCode: 'ADMINVIP',
@@ -97,6 +98,54 @@ export const loginUser = (
     } catch (e) {}
     return { success: true, message: 'Welcome to Admin Panel!', user: adminProfile };
   }
+
+  // Check Vendor Admins list (e.g. Owner, Admin, Manager, ProductAdder)
+  try {
+    const rawAdmins = localStorage.getItem('dsp_vendor_admins_v1');
+    if (rawAdmins) {
+      const vendorAdmins: any[] = JSON.parse(rawAdmins);
+      const matchedAdmin = vendorAdmins.find((va) => {
+        const matchUser =
+          (va.username && va.username.toLowerCase() === cleanId) ||
+          (va.name && va.name.toLowerCase() === cleanId);
+        const matchPass = va.password ? va.password === cleanPass : cleanPass === '123456' || cleanPass === 'admin';
+        return matchUser && matchPass;
+      });
+
+      if (matchedAdmin) {
+        if (matchedAdmin.access === 'Restricted') {
+          return {
+            success: false,
+            message: 'Your account access has been restricted by the store owner.',
+          };
+        }
+
+        const adminProfile: UserProfile = {
+          id: matchedAdmin.id,
+          name: matchedAdmin.name,
+          email: matchedAdmin.username,
+          phone: '01712792184',
+          role: 'admin',
+          adminRole: matchedAdmin.role || 'ProductAdder',
+          avatar: matchedAdmin.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+          walletBalance: 0,
+          referralCode: 'ADMINVIP',
+          createdAt: matchedAdmin.registeredAt || new Date().toISOString(),
+        };
+
+        try {
+          localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(adminProfile));
+        } catch (e) {}
+
+        const roleTitle = matchedAdmin.role === 'ProductAdder' ? 'Product Manager' : matchedAdmin.role;
+        return {
+          success: true,
+          message: `Welcome ${matchedAdmin.name} (${roleTitle})!`,
+          user: adminProfile,
+        };
+      }
+    }
+  } catch (e) {}
 
   const users = getRegisteredUsers();
   const found = users.find(

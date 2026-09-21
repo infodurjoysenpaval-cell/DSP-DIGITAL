@@ -27,11 +27,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onLogout,
   onViewProductOnSite,
 }) => {
-  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const isProductOnly = currentUser?.adminRole === 'ProductAdder';
+  const [activeTab, setActiveTab] = useState<AdminTab>(() =>
+    isProductOnly ? 'products' : 'dashboard'
+  );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Page title mapping matching screenshots
   const getHeaderTitle = (): string => {
+    if (isProductOnly) {
+      return 'Product Management (Add & Manage Products)';
+    }
     switch (activeTab) {
       case 'dashboard':
         return 'Overview';
@@ -67,11 +73,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* Sidebar */}
       <AdminSidebar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={(tab) => {
+          if (isProductOnly) {
+            setActiveTab('products');
+          } else {
+            setActiveTab(tab);
+          }
+        }}
         onVisitWebsite={onVisitWebsite}
         onLogout={onLogout}
         isOpenMobile={mobileSidebarOpen}
         onCloseMobile={() => setMobileSidebarOpen(false)}
+        currentUser={currentUser}
       />
 
       {/* Main Content Area */}
@@ -86,32 +99,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
         {/* Scrollable View Area */}
         <main className="flex-1 overflow-y-auto">
-          {activeTab === 'dashboard' && <AdminOverview />}
-
-          {activeTab === 'products' && (
+          {isProductOnly ? (
             <AdminProducts onViewProductOnSite={onViewProductOnSite} />
+          ) : (
+            <>
+              {activeTab === 'dashboard' && <AdminOverview />}
+
+              {activeTab === 'products' && (
+                <AdminProducts onViewProductOnSite={onViewProductOnSite} />
+              )}
+
+              {(activeTab === 'theme-view' ||
+                activeTab === 'customization' ||
+                activeTab === 'carousel' ||
+                activeTab === 'banner' ||
+                activeTab === 'popup' ||
+                activeTab === 'website-info') && (
+                <AdminThemeCustomization onBack={() => setActiveTab('dashboard')} />
+              )}
+
+              {activeTab === 'settings' && <AdminSettings />}
+
+              {activeTab === 'customer' && <AdminCustomers />}
+
+              {activeTab === 'affiliates' && <AdminAffiliates />}
+
+              {activeTab === 'admin-control' && <AdminVendors />}
+
+              {activeTab === 'orders' && <AdminOrders />}
+
+              {activeTab === 'incomplete-orders' && <AdminIncompleteOrders />}
+            </>
           )}
-
-          {(activeTab === 'theme-view' ||
-            activeTab === 'customization' ||
-            activeTab === 'carousel' ||
-            activeTab === 'banner' ||
-            activeTab === 'popup' ||
-            activeTab === 'website-info') && (
-            <AdminThemeCustomization onBack={() => setActiveTab('dashboard')} />
-          )}
-
-          {activeTab === 'settings' && <AdminSettings />}
-
-          {activeTab === 'customer' && <AdminCustomers />}
-
-          {activeTab === 'affiliates' && <AdminAffiliates />}
-
-          {activeTab === 'admin-control' && <AdminVendors />}
-
-          {activeTab === 'orders' && <AdminOrders />}
-
-          {activeTab === 'incomplete-orders' && <AdminIncompleteOrders />}
 
           {activeTab === 'additional-pages' && <AdminAdditionalPages />}
 

@@ -16,6 +16,7 @@ import {
   addVendorAdmin,
   saveVendorAdmins,
   VendorAdmin,
+  VendorRole,
 } from '../../utils/adminStore';
 
 export const AdminVendors: React.FC = () => {
@@ -27,7 +28,8 @@ export const AdminVendors: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     username: '',
-    role: 'Admin' as 'Owner' | 'Admin' | 'Manager',
+    password: '',
+    role: 'ProductAdder' as VendorRole,
     access: 'Allowed' as 'Allowed' | 'Restricted',
     avatar: '',
   });
@@ -66,8 +68,9 @@ export const AdminVendors: React.FC = () => {
     const created = addVendorAdmin({
       name: formData.name,
       username: formData.username,
+      password: formData.password.trim() || '123456',
       role: formData.role,
-      lastLogin: 'Just now',
+      lastLogin: 'Never',
       registeredAt: new Date().toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -79,8 +82,8 @@ export const AdminVendors: React.FC = () => {
 
     setAdmins(getVendorAdmins());
     setIsAddModalOpen(false);
-    setFormData({ name: '', username: '', role: 'Admin', access: 'Allowed', avatar: '' });
-    setMsg('New vendor admin added successfully.');
+    setFormData({ name: '', username: '', password: '', role: 'ProductAdder', access: 'Allowed', avatar: '' });
+    setMsg('New user added successfully.');
     setTimeout(() => setMsg(''), 3000);
   };
 
@@ -216,8 +219,16 @@ export const AdminVendors: React.FC = () => {
                   <td className="p-3.5 font-mono text-slate-600">{adm.username}</td>
 
                   <td className="p-3.5">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-[#0052FF] border border-blue-200">
-                      {adm.role}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                      adm.role === 'ProductAdder'
+                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                        : adm.role === 'Owner'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : adm.role === 'Manager'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-blue-50 text-[#0052FF] border-blue-200'
+                    }`}>
+                      {adm.role === 'ProductAdder' ? 'Product Manager (Only Products)' : adm.role}
                     </span>
                   </td>
 
@@ -305,16 +316,41 @@ export const AdminVendors: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Role</label>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Login Password * (লগইন পাসওয়ার্ড)
+                </label>
+                <input
+                  type="text"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="123456 or custom password"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#0052FF]"
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5">ফাঁকা রাখলে ডিফল্ট পাসওয়ার্ড হবে 123456</p>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Role / পদবি *</label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#0052FF]"
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as VendorRole })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#0052FF] font-medium"
                 >
-                  <option value="Admin">Admin</option>
+                  <option value="ProductAdder">Product Manager (Only Add Products / শুধু প্রোডাক্ট অ্যাড)</option>
                   <option value="Manager">Manager</option>
+                  <option value="Admin">Admin</option>
                   <option value="Owner">Owner</option>
                 </select>
+                {formData.role === 'ProductAdder' && (
+                  <div className="mt-1.5 p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-[11px] text-purple-900 leading-snug">
+                    <p className="font-bold flex items-center gap-1">
+                      <span>🔒</span> সীমাবদ্ধ ভূমিকা (Restricted Role):
+                    </p>
+                    <p className="text-purple-700 mt-0.5">
+                      এই ইউজার অ্যাডমিন প্যানেলে লগইন করে শুধুমাত্র নতুন প্রোডাক্ট অ্যাড ও ম্যানেজ করতে পারবে। এছাড়া ড্যাশবোর্ড, সেটিংস, অর্ডার বা অন্য কোনো পেইজে তার এক্সেস থাকবে না।
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>

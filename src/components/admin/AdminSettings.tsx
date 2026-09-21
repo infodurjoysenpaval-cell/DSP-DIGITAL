@@ -127,6 +127,11 @@ export const AdminSettings: React.FC = () => {
           label: 'SSL Active',
           active: true,
         };
+      case 'homepage-stats':
+        return {
+          label: `${settings.homepageStats?.ordersDelivered || '48K+'} Orders`,
+          active: true,
+        };
       default:
         return {
           label: 'Configured',
@@ -290,6 +295,13 @@ export const AdminSettings: React.FC = () => {
       desc: 'Automated VoIP phone calls to verify high-value orders instantly',
       icon: PhoneCall,
       color: 'bg-lime-50 text-lime-700',
+    },
+    {
+      id: 'homepage-stats',
+      title: 'Homepage Stats & Counters',
+      desc: 'কতগুলো অর্ডার ডেলিভারি হয়েছে, হ্যাপি কাস্টমার, এভারেজ ডেলিভারি টাইম, ভেরিফাইড রিভিউ',
+      icon: Sparkles,
+      color: 'bg-indigo-50 text-indigo-600',
     },
     {
       id: 'bizmation',
