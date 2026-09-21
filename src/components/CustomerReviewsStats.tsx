@@ -170,7 +170,7 @@ export const CustomerReviewsStats: React.FC = () => {
       </div>
 
       {/* Customer Reviews Section */}
-      <div className="bg-[#F8FAFC] py-10 px-4 border-t border-slate-200 relative">
+      <div id="customer-reviews-section" className="bg-[#F8FAFC] py-10 px-4 border-t border-slate-200 relative">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-6">
             <span className="text-xs font-sub-heading uppercase tracking-widest text-blue-600">

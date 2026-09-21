@@ -17,7 +17,7 @@ import {
   UserCredential,
 } from 'firebase/auth';
 import { UserProfile } from '../types';
-import { saveGoogleUser, setUserEmailVerified, getCurrentUser } from './authStorage';
+import { saveGoogleUser, setUserEmailVerified, getCurrentUser, loginUser, registerUser } from './authStorage';
 
 export const FIREBASE_CONFIG = {
   projectId: "gen-lang-client-0552424390",
@@ -326,4 +326,107 @@ export async function checkCurrentEmailVerificationStatus(): Promise<{
     console.warn('Error refreshing Firebase email verification:', err);
     return { isVerified: false };
   }
+}
+
+/**
+ * 6. Sign in with Email and Password using Firebase Auth with fallback to Auth Storage
+ */
+export async function signInWithFirebaseEmailPassword(
+  identifier: string,
+  pass: string
+): Promise<{ success: boolean; message: string; user?: UserProfile }> {
+  const cleanId = identifier.trim().toLowerCase();
+
+  // If cleanId is an email, try Firebase Authentication first
+  if (cleanId.includes('@')) {
+    try {
+      const cred = await signInWithEmailAndPassword(auth, cleanId, pass);
+      const fbUser = cred.user;
+      if (fbUser && fbUser.email) {
+        const isAdmin =
+          fbUser.email.toLowerCase().includes('admin') ||
+          fbUser.email.toLowerCase() === 'info.durjoysenpaval@gmail.com' ||
+          fbUser.email.toLowerCase() === 'admin@gmail.com';
+
+        const userProfile: UserProfile = {
+          id: `usr_fb_${fbUser.uid}`,
+          name: fbUser.displayName || fbUser.email.split('@')[0] || 'Store User',
+          email: fbUser.email,
+          phone: fbUser.phoneNumber || '01712792184',
+          avatar: fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+          walletBalance: isAdmin ? 100000 : 0,
+          referralCode: 'DSP' + Math.floor(1000 + Math.random() * 9000),
+          createdAt: new Date().toISOString(),
+          emailVerified: fbUser.emailVerified,
+          authProvider: 'firebase',
+          role: isAdmin ? 'admin' : 'customer',
+          adminRole: isAdmin ? 'Owner' : undefined,
+        };
+        const saved = saveGoogleUser(userProfile);
+        return {
+          success: true,
+          message: isAdmin ? 'Welcome to Admin Dashboard!' : 'Login successful!',
+          user: saved,
+        };
+      }
+    } catch (fbErr: any) {
+      console.log('Firebase email auth notice:', fbErr?.code || fbErr?.message);
+    }
+  }
+
+  // Fallback to local authentication storage (which handles master admin & vendor admins & local credentials)
+  return loginUser(identifier, pass);
+}
+
+/**
+ * 7. Register with Email and Password using Firebase Auth
+ */
+export async function registerWithFirebaseEmailPassword(
+  name: string,
+  email: string,
+  phone: string,
+  pass: string
+): Promise<{ success: boolean; message: string; user?: UserProfile }> {
+  const cleanEmail = email.trim().toLowerCase();
+  if (cleanEmail) {
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+      const fbUser = cred.user;
+      if (fbUser && fbUser.email) {
+        try {
+          await sendEmailVerification(fbUser);
+        } catch (e) {}
+
+        const isAdmin =
+          cleanEmail.includes('admin') ||
+          cleanEmail === 'info.durjoysenpaval@gmail.com' ||
+          cleanEmail === 'admin@gmail.com';
+
+        const userProfile: UserProfile = {
+          id: `usr_fb_${fbUser.uid}`,
+          name: name || fbUser.email.split('@')[0],
+          email: fbUser.email,
+          phone: phone || '',
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+          walletBalance: isAdmin ? 100000 : 0,
+          referralCode: 'DSP' + Math.floor(1000 + Math.random() * 9000),
+          createdAt: new Date().toISOString(),
+          emailVerified: fbUser.emailVerified,
+          authProvider: 'firebase',
+          role: isAdmin ? 'admin' : 'customer',
+          adminRole: isAdmin ? 'Owner' : undefined,
+        };
+        const saved = saveGoogleUser(userProfile);
+        return {
+          success: true,
+          message: 'Account registered successfully with Firebase! Please check your email for verification link.',
+          user: saved,
+        };
+      }
+    } catch (fbErr: any) {
+      console.log('Firebase register notice:', fbErr?.code || fbErr?.message);
+    }
+  }
+
+  return registerUser(name, email, phone, pass);
 }

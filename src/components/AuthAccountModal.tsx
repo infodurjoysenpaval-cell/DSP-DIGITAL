@@ -17,6 +17,8 @@ import { loginUser, registerUser, saveGoogleUser } from '../utils/authStorage';
 import {
   performOfficialGoogleSignIn,
   sendEmailSignInVerificationLink,
+  signInWithFirebaseEmailPassword,
+  registerWithFirebaseEmailPassword,
   GOOGLE_OAUTH_CLIENT_ID,
   parseJwt,
 } from '../utils/firebase';
@@ -153,14 +155,14 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
   };
 
   // Login Submit
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
     setLoading(true);
 
-    setTimeout(() => {
-      const res = loginUser(identifier, password);
+    try {
+      const res = await signInWithFirebaseEmailPassword(identifier, password);
       setLoading(false);
 
       if (!res.success) {
@@ -177,11 +179,14 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
           onOpenDashboard?.(authedUser);
         }, 400);
       }
-    }, 350);
+    } catch (err: any) {
+      setLoading(false);
+      setErrorMsg(err?.message || 'Login failed.');
+    }
   };
 
   // Register Submit
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
@@ -193,8 +198,8 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
 
     setLoading(true);
 
-    setTimeout(() => {
-      const res = registerUser(regName, regEmail, regPhone, regPassword);
+    try {
+      const res = await registerWithFirebaseEmailPassword(regName, regEmail, regPhone, regPassword);
       setLoading(false);
 
       if (!res.success) {
@@ -211,7 +216,10 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
           onOpenDashboard?.(authedUser);
         }, 400);
       }
-    }, 400);
+    } catch (err: any) {
+      setLoading(false);
+      setErrorMsg(err?.message || 'Registration failed.');
+    }
   };
 
   // Forgot Password Submit

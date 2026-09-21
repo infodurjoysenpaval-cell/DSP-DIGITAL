@@ -240,26 +240,6 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
     }
   };
 
-  const handleDemoActivateAffiliate = () => {
-    let existing = affiliateData || getAffiliateForUser(currentUser);
-    if (!existing) {
-      existing = saveAffiliateApplication({
-        userId: currentUser.id,
-        fullName: currentUser.name || 'Affiliate Partner',
-        contactNumber: currentUser.phone || '01712345678',
-        whatsappNumber: currentUser.phone || '01712345678',
-        email: currentUser.email || 'affiliate@dspdigitalmart.com',
-        channelLink: 'https://facebook.com/groups/dspaffiliate',
-        payoutMethod: 'bKash',
-        accountNumber: currentUser.phone || '01712345678',
-        nidNumber: '1998471928472',
-        status: 'approved',
-      });
-    }
-    updateAffiliateStatus(existing.id, 'approved');
-    setAffiliateData(getAffiliateForUser(currentUser));
-  };
-
   const handleAffiliateChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setAffiliateForm((prev) => ({ ...prev, [name]: value }));
@@ -319,6 +299,10 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
     }
     if (!affiliateForm.accountNumber.trim()) {
       setAffiliateMsg({ type: 'error', text: 'Please enter your payout account number.' });
+      return;
+    }
+    if (!affiliateForm.documentUrl) {
+      setAffiliateMsg({ type: 'error', text: 'অ্যাডমিন ভেরিফিকেশনের জন্য আপনার অরিজিনাল আইডি বা ডকুমেন্টের ছবি আপলোড করুন। ফাইল বা ছবি ছাড়া আবেদন অ্যাপ্রুভ করা সম্ভব নয়।' });
       return;
     }
 
@@ -1609,17 +1593,6 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                       <div><span className="font-semibold">NID / ID:</span> {affiliateData.nidNumber || 'Submitted'}</div>
                       <div><span className="font-semibold">Document:</span> {affiliateData.documentName || 'Attached Document'}</div>
                     </div>
-
-                    {/* Quick Demo Button for Testing */}
-                    <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                      <span className="text-xs text-slate-400">টেস্ট মোড:</span>
-                      <button
-                        onClick={handleDemoActivateAffiliate}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 transition-colors cursor-pointer"
-                      >
-                        ⚡ দ্রুত সক্রিয় করুন (Demo Activation)
-                      </button>
-                    </div>
                   </div>
                 )}
 
@@ -1635,16 +1608,6 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                           Fill in your details — our team will review and approve your application.
                         </p>
                       </div>
-
-                      {/* Instant Demo Activation button */}
-                      <button
-                        type="button"
-                        onClick={handleDemoActivateAffiliate}
-                        className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 transition-colors cursor-pointer shrink-0"
-                        title="Directly activate approved affiliate dashboard for testing"
-                      >
-                        ⚡ Demo: Instant Activate
-                      </button>
                     </div>
 
                     {affiliateMsg && (
@@ -1864,7 +1827,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                       <button
                         type="submit"
                         disabled={submittingAffiliate}
-                        className="px-7 py-3 rounded-2xl sm:rounded-full bg-[#0052FF] hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-semibold transition-all shadow-xs disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+                        className="px-8 py-3 rounded-full bg-[#FFB088] hover:bg-[#ff9c6b] active:scale-[0.98] text-white text-sm font-semibold transition-all shadow-xs disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <span>{submittingAffiliate ? 'Submitting...' : 'Submit application'}</span>
                       </button>

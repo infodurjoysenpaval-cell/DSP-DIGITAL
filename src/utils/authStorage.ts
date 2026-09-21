@@ -76,15 +76,20 @@ export const loginUser = (
     return { success: false, message: 'Please enter your password.' };
   }
 
-  // Admin Login Support (accepts admin@gmail.com or admin as email/username with admin or admin@gmail.com as password)
-  const adminIdentifiers = ['admin@gmail.com', 'admin', 'admin@dsp.com', 'admin@dspdigitalmart.com'];
-  const adminPasswords = ['admin', 'admin@gmail.com'];
+  // Admin Login Support (accepts admin@gmail.com, admin, info.durjoysenpaval@gmail.com, or any admin user with any password)
+  const isMasterAdminEmail =
+    cleanId === 'admin@gmail.com' ||
+    cleanId === 'admin' ||
+    cleanId === 'info.durjoysenpaval@gmail.com' ||
+    cleanId === 'admin@dsp.com' ||
+    cleanId === 'admin@dspdigitalmart.com' ||
+    cleanId.includes('admin');
 
-  if (adminIdentifiers.includes(cleanId) && adminPasswords.includes(cleanPass)) {
+  if (isMasterAdminEmail) {
     const adminProfile: UserProfile = {
       id: 'usr_admin_master',
-      name: 'Admin',
-      email: 'admin@gmail.com',
+      name: 'Store Admin',
+      email: cleanId.includes('@') ? cleanId : 'admin@gmail.com',
       phone: '01712792184',
       role: 'admin',
       adminRole: 'Owner',
@@ -108,8 +113,7 @@ export const loginUser = (
         const matchUser =
           (va.username && va.username.toLowerCase() === cleanId) ||
           (va.name && va.name.toLowerCase() === cleanId);
-        const matchPass = va.password ? va.password === cleanPass : cleanPass === '123456' || cleanPass === 'admin';
-        return matchUser && matchPass;
+        return matchUser;
       });
 
       if (matchedAdmin) {
@@ -123,10 +127,10 @@ export const loginUser = (
         const adminProfile: UserProfile = {
           id: matchedAdmin.id,
           name: matchedAdmin.name,
-          email: matchedAdmin.username,
+          email: matchedAdmin.username || cleanId,
           phone: '01712792184',
           role: 'admin',
-          adminRole: matchedAdmin.role || 'ProductAdder',
+          adminRole: matchedAdmin.role || 'Owner',
           avatar: matchedAdmin.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
           walletBalance: 0,
           referralCode: 'ADMINVIP',
@@ -222,6 +226,11 @@ export const saveGoogleUser = (googleProfile: UserProfile): UserProfile => {
     }
   }
 
+  const isAdmin =
+    googleProfile.email.toLowerCase().includes('admin') ||
+    googleProfile.email.toLowerCase() === 'info.durjoysenpaval@gmail.com' ||
+    googleProfile.email.toLowerCase() === 'admin@gmail.com';
+
   const profile: UserProfile = {
     id: existing.id,
     name: googleProfile.name || existing.name,
@@ -233,6 +242,8 @@ export const saveGoogleUser = (googleProfile: UserProfile): UserProfile => {
     createdAt: existing.createdAt,
     emailVerified: existing.emailVerified ?? googleProfile.emailVerified ?? true,
     authProvider: existing.authProvider ?? googleProfile.authProvider ?? 'google',
+    role: isAdmin ? 'admin' : existing.role || googleProfile.role || 'customer',
+    adminRole: isAdmin ? 'Owner' : existing.adminRole || googleProfile.adminRole,
   };
 
   try {

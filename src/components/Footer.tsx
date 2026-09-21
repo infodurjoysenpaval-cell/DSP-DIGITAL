@@ -230,7 +230,7 @@ export const Footer: React.FC<FooterProps> = ({ onSelectPolicy }) => {
   return (
     <>
       <footer
-        id="main-site-footer"
+        id="footer-support-section"
         className="bg-white text-slate-700 border-t border-slate-200/90 pt-10 pb-4"
       >
         {/* Centered container with balanced padding & max-width matching reference image */}

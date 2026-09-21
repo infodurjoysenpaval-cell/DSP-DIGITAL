@@ -262,17 +262,10 @@ src="https://www.facebook.com/tr?id=1372451788410293&ev=PageView&noscript=1"
   },
 
   tiktokPixel: {
-    pixelId: 'C79234KL129841',
-    headerScript: `<!-- TikTok Pixel Code -->
-<script>
-!function (w, d, t) {
-  w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e};ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
-  ttq.load('C79234KL129841');
-  ttq.page();
-}(window, document, 'ttq');
-</script>`,
-    accessToken: 'tiktok_events_token_sample',
-    enabled: true,
+    pixelId: '',
+    headerScript: '',
+    accessToken: '',
+    enabled: false,
   },
 
   tagManager: {
@@ -530,9 +523,18 @@ export const getStoreSettings = (): StoreSettings => {
         }
         return fp;
       })(),
-      tiktokPixel: typeof parsed.tiktokPixel === 'object' && parsed.tiktokPixel !== null
-        ? { ...DEFAULT_STORE_SETTINGS.tiktokPixel, ...parsed.tiktokPixel }
-        : { ...DEFAULT_STORE_SETTINGS.tiktokPixel, pixelId: typeof parsed.tiktokPixel === 'string' ? parsed.tiktokPixel : DEFAULT_STORE_SETTINGS.tiktokPixel.pixelId },
+      tiktokPixel: (() => {
+        const tp = typeof parsed.tiktokPixel === 'object' && parsed.tiktokPixel !== null
+          ? { ...DEFAULT_STORE_SETTINGS.tiktokPixel, ...parsed.tiktokPixel }
+          : { ...DEFAULT_STORE_SETTINGS.tiktokPixel };
+        if (tp.pixelId === 'C79234KL129841' || !tp.pixelId) {
+          tp.pixelId = '';
+          tp.headerScript = '';
+          tp.accessToken = '';
+          tp.enabled = false;
+        }
+        return tp;
+      })(),
       tagManager: (() => {
         const tm = typeof parsed.tagManager === 'object' && parsed.tagManager !== null
           ? { ...DEFAULT_STORE_SETTINGS.tagManager, ...parsed.tagManager }
@@ -580,7 +582,7 @@ export const getVendorAdmins = (): VendorAdmin[] => {
       const initial: VendorAdmin[] = [
         {
           id: 'adm_1',
-          name: 'Demo23',
+          name: 'Store Owner',
           username: 'admin@gmail.com',
           role: 'Owner',
           lastLogin: 'Today',
@@ -592,7 +594,10 @@ export const getVendorAdmins = (): VendorAdmin[] => {
       localStorage.setItem(VENDOR_ADMINS_KEY, JSON.stringify(initial));
       return initial;
     }
-    return JSON.parse(raw);
+    const list = JSON.parse(raw);
+    return Array.isArray(list)
+      ? list.map((a: VendorAdmin) => a.name === 'Demo23' ? { ...a, name: 'Store Owner' } : a)
+      : [];
   } catch (e) {
     return [];
   }

@@ -169,6 +169,9 @@ export default function App() {
   // Open customer account dashboard or admin panel
   const handleOpenDashboard = (tab?: string, targetUser?: UserProfile | null) => {
     const active = targetUser || currentUser || getCurrentUser();
+    if (active) {
+      setCurrentUser(active);
+    }
     if (!active) {
       setAuthModalMode('login');
       setIsAuthModalOpen(true);
@@ -432,10 +435,11 @@ export default function App() {
   }, [liveProducts]);
 
   // If current view is Admin Panel and user is admin, render the full admin dashboard
-  if (currentView === 'admin' && currentUser?.role === 'admin') {
+  const activeAdminUser = currentUser || getCurrentUser();
+  if (currentView === 'admin' && activeAdminUser?.role === 'admin') {
     return (
       <AdminPanel
-        currentUser={currentUser}
+        currentUser={activeAdminUser}
         onVisitWebsite={() => {
           setCurrentView('store');
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -483,6 +487,7 @@ export default function App() {
         onLogoClick={handleBackFromProduct}
         isAffiliateOpen={isAffiliateOpen}
         setIsAffiliateOpen={setIsAffiliateOpen}
+        onUserChange={(u) => setCurrentUser(u)}
       />
 
       <main className="flex-1">

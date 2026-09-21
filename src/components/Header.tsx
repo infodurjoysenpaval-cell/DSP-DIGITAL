@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingBag, Phone, Menu, X, ChevronRight, Zap, ShieldCheck, User, Sparkles, Star, MessageCircle, ExternalLink, CheckCircle2, Wallet } from 'lucide-react';
+import { Search, ShoppingBag, Phone, Menu, X, ChevronRight, ChevronDown, Zap, ShieldCheck, User, Sparkles, Star, MessageCircle, ExternalLink, CheckCircle2, Wallet, ArrowRight, Loader2, Upload, FileText, Check } from 'lucide-react';
 import { SHOP_INFO, CATEGORIES, PRODUCTS } from '../data/storeData';
 import { Product, Category, UserProfile } from '../types';
+import { registerUser, loginUser } from '../utils/authStorage';
+import { saveAffiliateApplication } from '../utils/affiliateStorage';
 
 interface HeaderProps {
   cartCount: number;
@@ -14,6 +16,7 @@ interface HeaderProps {
   mobileMenuOpen?: boolean;
   setMobileMenuOpen?: (open: boolean) => void;
   currentUser?: UserProfile | null;
+  onUserChange?: (user: UserProfile | null) => void;
   onOpenAuth?: (mode?: 'login' | 'register') => void;
   onOpenDashboard?: (tab?: string) => void;
   onLogoClick?: () => void;
@@ -32,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   mobileMenuOpen: externalMenuOpen,
   setMobileMenuOpen: externalSetMenuOpen,
   currentUser,
+  onUserChange,
   onOpenAuth,
   onOpenDashboard,
   onLogoClick,
@@ -47,6 +51,123 @@ export const Header: React.FC<HeaderProps> = ({
   const isAffiliateModalOpen = externalAffiliateOpen !== undefined ? externalAffiliateOpen : internalAffiliateOpen;
   const setIsAffiliateModalOpen = externalSetAffiliateOpen || setInternalAffiliateOpen;
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Affiliate Application Form States
+  const [affFullName, setAffFullName] = useState('');
+  const [affPhone, setAffPhone] = useState('');
+  const [affWhatsapp, setAffWhatsapp] = useState('');
+  const [affEmail, setAffEmail] = useState('');
+  const [affPassword, setAffPassword] = useState('');
+  const [affChannelLink, setAffChannelLink] = useState('');
+  const [affPayoutMethod, setAffPayoutMethod] = useState<'bKash' | 'Nagad' | 'Rocket'>('bKash');
+  const [affAccountNumber, setAffAccountNumber] = useState('');
+  const [affNidNumber, setAffNidNumber] = useState('');
+  const [affDocName, setAffDocName] = useState('');
+  const [affDocUrl, setAffDocUrl] = useState('');
+  const [affSubmitting, setAffSubmitting] = useState(false);
+  const [affError, setAffError] = useState('');
+  const [affSuccess, setAffSuccess] = useState(false);
+
+  const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 8 * 1024 * 1024) {
+        setAffError('ফাইলের আকার সর্বোচ্চ ৮ মেগাবাইট (8MB) হতে পারবে।');
+        return;
+      }
+      setAffDocName(file.name);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAffDocUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDirectAffiliateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAffError('');
+    const cleanName = affFullName.trim();
+    const cleanPhone = affPhone.trim();
+    const cleanEmail = affEmail.trim();
+    const cleanPass = affPassword.trim();
+    const cleanAccount = affAccountNumber.trim();
+
+    if (!cleanName || cleanName.length < 3) {
+      setAffError('অনুগ্রহ করে আপনার পূর্ণ নাম লিখুন (কমপক্ষে ৩ অক্ষর)।');
+      return;
+    }
+    const phoneDigits = cleanPhone.replace(/[^0-9]/g, '');
+    if (phoneDigits.length !== 11 || !phoneDigits.startsWith('01')) {
+      setAffError('অনুগ্রহ করে একটি সঠিক ১১-ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)।');
+      return;
+    }
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setAffError('অনুগ্রহ করে একটি সঠিক ইমেইল ঠিকানা দিন।');
+      return;
+    }
+    if (!cleanPass || cleanPass.length < 6) {
+      setAffError('লগইন সুরক্ষার জন্য কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড দিন।');
+      return;
+    }
+    if (!cleanAccount) {
+      setAffError('উইথড্র করার জন্য আপনার বিকাশ/নগদ/রকেট নম্বরটি দিন।');
+      return;
+    }
+    if (!affDocUrl) {
+      setAffError('অ্যাডমিন ভেরিফিকেশনের জন্য আপনার অরিজিনাল এনআইডি/আইডি ডকুমেন্টের ছবি বা ফাইল সিলেক্ট করে আপলোড করুন।');
+      return;
+    }
+
+    setAffSubmitting(true);
+    setTimeout(() => {
+      // 1. Try to register user account
+      let res = registerUser(cleanName, cleanEmail, cleanPhone, cleanPass);
+      let user = res.user;
+
+      if (!res.success) {
+        // If phone or email already registered, try logging them in with this password
+        const loginRes = loginUser(cleanPhone, cleanPass);
+        if (loginRes.success && loginRes.user) {
+          user = loginRes.user;
+        } else {
+          setAffError(res.message || 'এই নম্বর বা ইমেইল দিয়ে ইতিপূর্বে একাউন্ট খোলা হয়েছে। অনুগ্রহ করে "সাইন ইন" করে আবেদন করুন।');
+          setAffSubmitting(false);
+          return;
+        }
+      }
+
+      if (user) {
+        // 2. Save affiliate application
+        saveAffiliateApplication({
+          userId: user.id,
+          fullName: cleanName,
+          contactNumber: cleanPhone,
+          whatsappNumber: affWhatsapp.trim() || cleanPhone,
+          email: user.email,
+          channelLink: affChannelLink.trim() || 'Direct Affiliate Promotion',
+          payoutMethod: affPayoutMethod,
+          accountNumber: cleanAccount,
+          nidNumber: affNidNumber.trim() || 'NID Provided in Application',
+          documentUrl: affDocUrl || undefined,
+          documentName: affDocName || undefined,
+          status: 'pending',
+        });
+
+        // 3. Update state, notify user, close modal, and open user dashboard's affiliate tab
+        onUserChange?.(user);
+        setAffSubmitting(false);
+        setAffSuccess(true);
+        setTimeout(() => {
+          setIsAffiliateModalOpen(false);
+          setAffSuccess(false);
+          onOpenDashboard?.('affiliate');
+        }, 500);
+      } else {
+        setAffSubmitting(false);
+      }
+    }, 450);
+  };
 
   const searchHints = [
     'ChatGPT Plus',
@@ -255,14 +376,12 @@ export const Header: React.FC<HeaderProps> = ({
                 REVIEWS
               </button>
 
-              <a
-                href={`https://wa.me/${phone}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="py-1 border-b-2 border-transparent font-nav-text text-slate-700 hover:text-[#3B82F6] transition-all"
+              <button
+                onClick={() => scrollToSection('footer-support-section')}
+                className="py-1 border-b-2 border-transparent font-nav-text text-slate-700 hover:text-[#3B82F6] transition-all cursor-pointer"
               >
                 SUPPORT
-              </a>
+              </button>
             </nav>
 
             {/* Right: Wallet (when logged in) + Account/Sign In + Cart button */}
@@ -644,65 +763,255 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Become an Affiliate Modal */}
       {isAffiliateModalOpen && (
-        <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-5 sm:p-7 shadow-2xl border border-slate-200 relative my-auto animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto">
             <button
               onClick={() => setIsAffiliateModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 z-10 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-xs">
-                <Sparkles className="w-6 h-6" />
+            {currentUser ? (
+              <div className="text-center py-6 space-y-4">
+                <div className="w-12 h-12 rounded-full border-[1.5px] border-slate-900 flex items-center justify-center text-slate-900 font-bold text-lg mx-auto shadow-xs">
+                  $
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[#0F172A]">Affiliate Program Dashboard</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Hello <strong className="text-slate-800">{currentUser.name}</strong>, you are currently logged in.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsAffiliateModalOpen(false);
+                    onOpenDashboard?.('affiliate');
+                  }}
+                  className="w-full py-3.5 bg-[#FFB088] hover:bg-[#ff9c6b] text-white font-bold rounded-full shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
+                >
+                  <span>Go to Affiliate Dashboard</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
+            ) : (
               <div>
-                <h3 className="text-lg sm:text-xl font-sub-heading text-[#0F172A]">
-                  Become an Affiliate & Reseller
-                </h3>
-                <p className="text-xs text-slate-500 font-body-text">
-                  Official Partnership Program of DSP DIGITAL MART
-                </p>
-              </div>
-            </div>
+                {/* Header matching screenshot 2: Dollar icon + Affiliate Program */}
+                <div className="flex items-center gap-2.5 mb-5 pb-3 border-b border-slate-100">
+                  <div className="w-6 h-6 rounded-full border-[1.5px] border-slate-900 flex items-center justify-center text-slate-900 font-bold text-xs shrink-0">
+                    $
+                  </div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-main-heading">
+                    Affiliate Program
+                  </h1>
+                </div>
 
-            <div className="space-y-3 text-xs sm:text-sm text-slate-600 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-200 font-body-text">
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong className="font-semibold text-slate-800">10% to 25% Direct Commission:</strong> High earnings on every digital subscription and license sale.</span>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong className="font-semibold text-slate-800">Instant bKash/Nagad Payout:</strong> Withdraw your commission balance anytime without delay.</span>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong className="font-semibold text-slate-800">Reseller Wholesale Rates:</strong> Full flexibility to set your own pricing for your clients.</span>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong className="font-semibold text-slate-800">24/7 Dedicated Support:</strong> Dedicated partner assistance via WhatsApp whenever you need.</span>
-              </div>
-            </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                    Apply to become an affiliate
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-0.5 mb-5">
+                    Fill in your details — our team will review and approve your application.
+                  </p>
+                </div>
 
-            <div className="flex flex-col sm:flex-row gap-2.5">
-              <a
-                href={`https://wa.me/${phone}?text=${encodeURIComponent('Hello DSP DIGITAL MART, I want to become an affiliate / reseller.')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 py-3 px-4 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs sm:text-sm font-btn-text rounded-xl text-center flex items-center justify-center gap-2 shadow-xs transition-colors"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>Join via WhatsApp</span>
-              </a>
-              <button
-                onClick={() => setIsAffiliateModalOpen(false)}
-                className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-btn-text rounded-xl transition-colors"
-              >
-                Maybe Later
-              </button>
-            </div>
+                {affError && (
+                  <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
+                    {affError}
+                  </div>
+                )}
+
+                {affSuccess && (
+                  <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl font-medium flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Application submitted successfully! Redirecting to dashboard...</span>
+                  </div>
+                )}
+
+                {/* Form matching screenshot 2 */}
+                <form onSubmit={handleDirectAffiliateSubmit} className="space-y-4">
+                  {/* Row 1: Full name + Contact number */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                        Full name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={affFullName}
+                        onChange={(e) => setAffFullName(e.target.value)}
+                        placeholder="Your name"
+                        className="w-full px-4 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 bg-white placeholder:text-slate-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                        Contact number
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={affPhone}
+                        onChange={(e) => setAffPhone(e.target.value)}
+                        placeholder="01XXXXXXXXX"
+                        className="w-full px-4 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 bg-white placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: WhatsApp number + Email */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                        WhatsApp number
+                      </label>
+                      <input
+                        type="tel"
+                        value={affWhatsapp}
+                        onChange={(e) => setAffWhatsapp(e.target.value)}
+                        placeholder="01XXXXXXXXX"
+                        className="w-full px-4 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 bg-white placeholder:text-slate-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={affEmail}
+                        onChange={(e) => setAffEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        className="w-full px-4 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 bg-white placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password field for account security */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                      Account Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={affPassword}
+                      onChange={(e) => setAffPassword(e.target.value)}
+                      placeholder="Minimum 6 characters password"
+                      className="w-full px-4 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 bg-white placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  {/* Row 3: Page / Group / Channel link */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                      Page / Group / Channel link (where you'll sell)
+                    </label>
+                    <input
+                      type="text"
+                      value={affChannelLink}
+                      onChange={(e) => setAffChannelLink(e.target.value)}
+                      placeholder="https://facebook.com/yourpage"
+                      className="w-full px-4 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 bg-white placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  {/* Row 4: Payout method + Account number */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                        Payout method
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={affPayoutMethod}
+                          onChange={(e) => setAffPayoutMethod(e.target.value as any)}
+                          className="w-full appearance-none px-4 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl text-slate-900 bg-white focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 cursor-pointer pr-10"
+                        >
+                          <option value="bKash">bKash</option>
+                          <option value="Nagad">Nagad</option>
+                          <option value="Rocket">Rocket</option>
+                          <option value="Bank Transfer">Bank Transfer</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                        Account number
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={affAccountNumber}
+                        onChange={(e) => setAffAccountNumber(e.target.value)}
+                        placeholder="01XXXXXXXXX"
+                        className="w-full px-4 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 bg-white placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* NID / Document Upload Section for Admin Verification */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Verification Document (NID Card / Student ID / Trade License Photo) <span className="text-rose-500">*</span>
+                    </label>
+                    <p className="text-[11px] text-slate-500 mb-2">
+                      অ্যাডমিন ভেরিফিকেশনের জন্য আপনার মূল আইডি কার্ডের পরিষ্কার ছবি বা ফাইল আপলোড করুন
+                    </p>
+                    <label className="flex items-center justify-between px-4 py-2.5 border border-dashed border-slate-300 rounded-xl bg-slate-50/80 hover:bg-slate-100 cursor-pointer text-slate-700 transition-colors">
+                      <div className="flex items-center gap-2 text-xs font-medium truncate">
+                        <Upload className="w-4 h-4 text-[#FF9B6D] shrink-0" />
+                        <span className="truncate">{affDocName || 'Click to select NID / ID photo or PDF'}</span>
+                      </div>
+                      <span className="text-[11px] font-bold text-[#FF9B6D] shrink-0 ml-2">Browse</span>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={handleDocUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Submit Button matching image 2: Pill peach button */}
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={affSubmitting}
+                      className="px-8 py-3 bg-[#FFB088] hover:bg-[#ff9c6b] active:scale-[0.99] text-white text-xs sm:text-sm font-semibold rounded-full text-center flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-60"
+                    >
+                      {affSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Submitting application...</span>
+                        </>
+                      ) : (
+                        <span>Submit application</span>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="text-left pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAffiliateModalOpen(false);
+                        onOpenAuth?.('login');
+                      }}
+                      className="text-xs text-slate-500 hover:text-slate-800 font-medium transition-colors cursor-pointer"
+                    >
+                      Already have an account? <span className="underline font-semibold">Sign in</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       )}
