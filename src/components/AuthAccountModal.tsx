@@ -355,7 +355,7 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="admin@gmail.com or admin"
+                  placeholder="01XXXXXXXXX or email@example.com"
                   className="w-full pl-10 pr-3.5 py-2.5 bg-transparent border-0 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
                 />
               </div>
@@ -562,7 +562,7 @@ export const AuthAccountModal: React.FC<AuthAccountModalProps> = ({
                   required
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="admin@gmail.com"
+                  placeholder="email@example.com"
                   className="w-full pl-10 pr-3.5 py-2.5 bg-transparent border-0 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
                 />
               </div>

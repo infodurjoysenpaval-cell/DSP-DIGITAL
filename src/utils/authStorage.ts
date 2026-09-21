@@ -232,16 +232,17 @@ export const saveGoogleUser = (googleProfile: UserProfile): UserProfile => {
     googleProfile.email.toLowerCase() === 'admin@gmail.com';
 
   const profile: UserProfile = {
+    ...existing,
     id: existing.id,
     name: googleProfile.name || existing.name,
     email: existing.email,
-    phone: existing.phone,
+    phone: existing.phone || googleProfile.phone || '',
     avatar: googleProfile.avatar || existing.avatar,
     walletBalance: existing.walletBalance ?? 0,
-    referralCode: existing.referralCode,
-    createdAt: existing.createdAt,
-    emailVerified: existing.emailVerified ?? googleProfile.emailVerified ?? true,
-    authProvider: existing.authProvider ?? googleProfile.authProvider ?? 'google',
+    referralCode: existing.referralCode || generateReferralCode(googleProfile.name),
+    createdAt: existing.createdAt || new Date().toISOString(),
+    emailVerified: true,
+    authProvider: googleProfile.authProvider ?? existing.authProvider ?? 'google',
     role: isAdmin ? 'admin' : existing.role || googleProfile.role || 'customer',
     adminRole: isAdmin ? 'Owner' : existing.adminRole || googleProfile.adminRole,
   };

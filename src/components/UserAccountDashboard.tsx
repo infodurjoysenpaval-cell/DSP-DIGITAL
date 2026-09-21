@@ -654,12 +654,12 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
               onClick={() => setActiveTab('affiliate')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-all duration-150 ${
                 activeTab === 'affiliate'
-                  ? 'bg-[#FFF0E6] text-[#EA580C] font-bold shadow-2xs'
+                  ? 'bg-blue-50 text-[#0052FF] font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
               }`}
             >
               {activeTab === 'affiliate' ? (
-                <div className="w-5 h-5 rounded-full bg-[#EA580C] text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                <div className="w-5 h-5 rounded-full bg-[#0052FF] text-white flex items-center justify-center text-[10px] font-black shrink-0">
                   $
                 </div>
               ) : (
@@ -1233,12 +1233,16 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                 {/* SCENARIO 2: APPROVED AFFILIATE (MATCHING REFERENCE SCREENSHOT) */}
                 {affiliateData && affiliateData.status === 'approved' && (
                   <div className="space-y-5">
-                    {/* Top Bronze/Copper Card: Available to Withdraw + Request payout */}
-                    <div className="rounded-3xl bg-gradient-to-br from-[#4a2614] via-[#5c331d] to-[#3a1d0f] text-white p-6 sm:p-8 shadow-md">
-                      <div className="text-xs font-semibold tracking-wider text-[#d4a383] uppercase">
-                        AVAILABLE TO WITHDRAW
+                    {/* Top Premium Card: Available to Withdraw + Request payout */}
+                    <div className="rounded-3xl bg-gradient-to-br from-[#0F172A] via-[#0F2942] to-[#0052FF] text-white p-6 sm:p-8 shadow-xl relative overflow-hidden">
+                      {/* Background decorative glow */}
+                      <div className="absolute -right-12 -top-12 w-48 h-48 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none" />
+
+                      <div className="text-xs font-extrabold tracking-wider text-cyan-300 uppercase flex items-center gap-2">
+                        <span>AVAILABLE TO WITHDRAW</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                       </div>
-                      <div className="text-3xl sm:text-4xl font-extrabold mt-1 tracking-tight">
+                      <div className="text-3xl sm:text-4xl font-extrabold mt-1 tracking-tight text-white drop-shadow-xs">
                         ৳{(affiliateData.availableBalance ?? 0).toLocaleString()}
                       </div>
 
@@ -1248,16 +1252,16 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                           <input
                             type="number"
                             min="100"
-                            placeholder="Amount"
+                            placeholder="Enter amount (Min ৳100)"
                             value={payoutAmount}
                             onChange={(e) => setPayoutAmount(e.target.value)}
-                            className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-[#FA5B0F]/50"
+                            className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white placeholder:text-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
                           />
                         </div>
                         <button
                           onClick={handleRequestPayout}
                           disabled={isRequestingPayout}
-                          className="px-6 py-3 rounded-2xl bg-[#5c331d] hover:bg-[#6e3c23] border border-white/20 text-white font-bold text-sm shadow-xs transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                          className="px-6 py-3 rounded-2xl bg-[#0052FF] hover:bg-[#0042cc] text-white font-bold text-sm shadow-md transition-all cursor-pointer shrink-0 disabled:opacity-50 hover:shadow-cyan-500/20 active:scale-98"
                         >
                           {isRequestingPayout ? 'Processing...' : 'Request payout'}
                         </button>
@@ -1275,7 +1279,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                         </div>
                       )}
 
-                      <div className="mt-3 text-[11px] text-[#cbb2a1]">
+                      <div className="mt-3 text-[11px] text-cyan-100/80">
                         Min ৳100 · Paid to {affiliateData.payoutMethod || 'bKash'} ({affiliateData.accountNumber || currentUser.phone || 'Account'})
                       </div>
                     </div>
@@ -1325,7 +1329,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                         />
                         <button
                           onClick={handleCopyAffiliateLink}
-                          className="px-5 py-3 rounded-xl bg-[#FA5B0F] hover:bg-[#EA4B00] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                          className="px-5 py-3 rounded-xl bg-[#0052FF] hover:bg-[#0042cc] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                         >
                           {affiliateLinkCopied ? (
                             <>
@@ -1347,8 +1351,8 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
 
                       {/* Benefits Highlight Box */}
                       <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="p-4 rounded-2xl bg-orange-50/60 border border-orange-200/60 flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-xl bg-[#EA580C] text-white flex items-center justify-center shrink-0 text-xs font-bold">
+                        <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200/60 flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-[#0052FF] text-white flex items-center justify-center shrink-0 text-xs font-bold">
                             15%
                           </div>
                           <div>
@@ -1378,7 +1382,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-[#EA580C]" />
+                            <Sparkles className="w-4 h-4 text-[#0052FF]" />
                             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
                               অ্যাফিলিয়েট প্রোডাক্ট তালিকা ও ১৫% ডিসকাউন্ট রেট
                             </h3>
@@ -1396,7 +1400,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                             placeholder="প্রোডাক্ট খুঁজুন..."
                             value={affiliateProductSearch}
                             onChange={(e) => setAffiliateProductSearch(e.target.value)}
-                            className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#EA580C] focus:bg-white transition-all"
+                            className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#0052FF] focus:bg-white transition-all"
                           />
                         </div>
                       </div>
@@ -1419,7 +1423,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                             return (
                               <div
                                 key={prod._id || prod.slug}
-                                className="p-3.5 rounded-2xl border border-slate-200/90 bg-white hover:border-orange-200 hover:shadow-xs transition-all flex flex-col justify-between gap-3"
+                                className="p-3.5 rounded-2xl border border-slate-200/90 bg-white hover:border-blue-200 hover:shadow-xs transition-all flex flex-col justify-between gap-3"
                               >
                                 <div className="flex items-start gap-3">
                                   <img
@@ -1442,7 +1446,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                                       </span>
                                       <span className="text-xs font-bold text-slate-900">
                                         ৳{affiliatePrice.toLocaleString()}{' '}
-                                        <span className="text-[10px] text-[#EA580C] font-semibold">(১৫% ছাড়)</span>
+                                        <span className="text-[10px] text-[#0052FF] font-semibold">(১৫% ছাড়)</span>
                                       </span>
                                     </div>
                                   </div>
@@ -1458,7 +1462,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => handleCopyProductLink(prod.slug)}
-                                      className="px-3 py-1.5 bg-slate-100 hover:bg-orange-50 hover:text-[#EA580C] hover:border-orange-200 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 flex items-center gap-1 transition-all cursor-pointer"
+                                      className="px-3 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-[#0052FF] hover:border-blue-200 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 flex items-center gap-1 transition-all cursor-pointer"
                                     >
                                       {isCopied ? (
                                         <>
