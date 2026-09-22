@@ -234,19 +234,19 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
               {/* Main Product Image */}
               <img
-                src={selectedImage || product.images[0]}
+                src={selectedImage || product.images?.[0] || '/logo.png'}
                 alt={product.name}
                 referrerPolicy="no-referrer"
                 className="w-full h-auto max-h-[440px] object-contain rounded-2xl select-none transition-all duration-300"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =
-                    product.images[0] || '/logo.png';
+                    product.images?.[0] || '/logo.png';
                 }}
               />
             </div>
 
             {/* Thumbnail Gallery (if multiple images) */}
-            {product.images.length > 1 && (
+            {product.images && product.images.length > 1 && (
               <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none">
                 {product.images.map((img, idx) => (
                   <button

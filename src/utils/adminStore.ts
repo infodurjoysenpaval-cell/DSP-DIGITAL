@@ -419,6 +419,10 @@ export const saveLiveProducts = (products: Product[]) => {
     window.dispatchEvent(new Event('dsp_products_updated'));
   } catch (e) {
     console.error('Failed to save live products', e);
+    try {
+      sessionStorage.setItem(LIVE_PRODUCTS_KEY, JSON.stringify(products));
+    } catch {}
+    window.dispatchEvent(new Event('dsp_products_updated'));
   }
 };
 
@@ -433,7 +437,11 @@ export const addLiveProduct = (newProd: Partial<Product>): Product => {
     _id: `prod_${Date.now()}`,
     name: newProd.name || 'New Product',
     slug: `${slug}-${Math.floor(100 + Math.random() * 900)}`,
-    images: newProd.images && newProd.images.length > 0 ? newProd.images : ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80'],
+    images: Array.isArray(newProd.images)
+      ? newProd.images
+      : newProd.images
+      ? [newProd.images]
+      : [],
     salePrice: newProd.salePrice ?? 500,
     regularPrice: newProd.regularPrice ?? 800,
     category: newProd.category || 'Software',

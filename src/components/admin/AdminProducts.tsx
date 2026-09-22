@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Search,
   Plus,
@@ -12,6 +12,9 @@ import {
   Image as ImageIcon,
   Save,
   Filter,
+  UploadCloud,
+  Loader2,
+  Package,
 } from 'lucide-react';
 import { Product } from '../../types';
 import {
@@ -20,6 +23,7 @@ import {
   updateLiveProduct,
   deleteLiveProduct,
 } from '../../utils/adminStore';
+import { compressImageFile } from '../../utils/imageCompressor';
 
 interface AdminProductsProps {
   onViewProductOnSite?: (product: Product) => void;
@@ -43,11 +47,16 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
     regularPrice: 800,
     stock: 100,
     openingStock: 100,
-    image: '',
+    images: [] as string[],
+    imageUrlInput: '',
     shortDescription: '',
     description: '',
     isPublished: true,
   });
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const reloadProducts = () => {
     setProducts(getLiveProducts());
@@ -104,6 +113,35 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
     );
   };
 
+  const handleImageUpload = async (files: FileList | File[]) => {
+    const fileList = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    if (fileList.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      const compressedResults: string[] = [];
+      for (const file of fileList) {
+        try {
+          const compressed = await compressImageFile(file, 1000, 0.82);
+          if (compressed) {
+            compressedResults.push(compressed);
+          }
+        } catch (err) {
+          console.error('Failed to compress image:', err);
+        }
+      }
+
+      if (compressedResults.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          images: [...prev.images, ...compressedResults],
+        }));
+      }
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleOpenAddModal = () => {
     setEditingProduct(null);
     setFormData({
@@ -113,7 +151,8 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
       regularPrice: 800,
       stock: 100,
       openingStock: 100,
-      image: '',
+      images: [],
+      imageUrlInput: '',
       shortDescription: 'Official digital license with 100% guarantee.',
       description: 'Instant delivery digital license key and activation guide.',
       isPublished: true,
@@ -123,6 +162,12 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
 
   const handleOpenEditModal = (p: Product) => {
     setEditingProduct(p);
+    const existingImages = Array.isArray(p.images)
+      ? p.images.filter((img) => typeof img === 'string' && img.trim().length > 0)
+      : typeof p.images === 'string' && (p.images as string).trim().length > 0
+      ? [p.images]
+      : [];
+
     setFormData({
       name: p.name,
       category: typeof p.category === 'string' ? p.category : p.category?.name || 'Software',
@@ -130,7 +175,8 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
       regularPrice: p.regularPrice ?? 0,
       stock: p.stock ?? 100,
       openingStock: p.openingStock ?? 100,
-      image: p.images?.[0] || '',
+      images: [...existingImages],
+      imageUrlInput: '',
       shortDescription: p.shortDescription || '',
       description: p.description || '',
       isPublished: p.isPublished !== false,
@@ -152,6 +198,10 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
       return;
     }
 
+    const finalImages = formData.images.filter(
+      (img) => typeof img === 'string' && img.trim().length > 0
+    );
+
     if (editingProduct) {
       updateLiveProduct(editingProduct._id, {
         name: formData.name,
@@ -160,7 +210,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
         regularPrice: Number(formData.regularPrice),
         stock: Number(formData.stock),
         openingStock: Number(formData.openingStock),
-        images: formData.image ? [formData.image] : editingProduct.images,
+        images: finalImages,
         shortDescription: formData.shortDescription,
         description: formData.description,
         isPublished: formData.isPublished,
@@ -173,7 +223,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
         regularPrice: Number(formData.regularPrice),
         stock: Number(formData.stock),
         openingStock: Number(formData.openingStock),
-        images: formData.image ? [formData.image] : ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80'],
+        images: finalImages,
         shortDescription: formData.shortDescription,
         description: formData.description,
         isPublished: formData.isPublished,
@@ -583,33 +633,202 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#0052FF]"
-                  >
-                    <option value="Operating System">Operating System</option>
-                    <option value="Office & Productivity">Office & Productivity</option>
-                    <option value="Antivirus & Security">Antivirus & Security</option>
-                    <option value="Design & Multimedia">Design & Multimedia</option>
-                    <option value="VPN & Streaming">VPN & Streaming</option>
-                    <option value="Software License">Software License</option>
-                  </select>
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Category</label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#0052FF]"
+                >
+                  <option value="Operating System">Operating System</option>
+                  <option value="Office & Productivity">Office & Productivity</option>
+                  <option value="Antivirus & Security">Antivirus & Security</option>
+                  <option value="Design & Multimedia">Design & Multimedia</option>
+                  <option value="VPN & Streaming">VPN & Streaming</option>
+                  <option value="Software License">Software License</option>
+                  <option value="Education & Learning Tools">Education & Learning Tools</option>
+                </select>
+              </div>
+
+              {/* Product Images Drag & Drop, Upload & Delete Management */}
+              <div className="space-y-2.5 p-3 sm:p-4 rounded-2xl bg-slate-50/70 border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <label className="block text-slate-800 font-bold text-xs">
+                    Product Images (প্রোডাক্টের ছবি)
+                  </label>
+                  {formData.images.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, images: [] })}
+                      className="text-red-500 hover:text-red-700 font-bold text-[11px] flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>সব ছবি মুছুন (Remove All)</span>
+                    </button>
+                  )}
                 </div>
 
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">Image URL</label>
+                {/* Drag & Drop Upload Zone */}
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDragging(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDragging(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                      handleImageUpload(e.dataTransfer.files);
+                    }
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`relative border-2 border-dashed rounded-xl p-4 transition-all text-center cursor-pointer flex flex-col items-center justify-center gap-2 select-none ${
+                    isDragging
+                      ? 'border-[#0052FF] bg-blue-50 scale-[1.01]'
+                      : 'border-slate-300 hover:border-[#0052FF] bg-white hover:bg-blue-50/30'
+                  }`}
+                >
                   <input
-                    type="url"
-                    value={formData.image}
-                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                    placeholder="https://..."
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#0052FF]"
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        handleImageUpload(e.target.files);
+                      }
+                      e.target.value = '';
+                    }}
                   />
+
+                  <div className="w-10 h-10 rounded-full bg-blue-100 text-[#0052FF] flex items-center justify-center shadow-2xs">
+                    {isUploading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <UploadCloud className="w-5 h-5" />
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">
+                      {isUploading
+                        ? 'ছবি অপটিমাইজ ও আপলোড হচ্ছে...'
+                        : 'ছবি এখানে ড্র্যাগ অ্যান্ড ড্রপ করুন (Drag & Drop image here)'}
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      বা ডিভাইস থেকে ছবি আপলোড করতে ক্লিক করুন (Click to upload from device) · JPG, PNG, WEBP
+                    </p>
+                  </div>
                 </div>
+
+                {/* Direct Image URL input */}
+                <div className="flex items-center gap-2 pt-0.5">
+                  <div className="relative flex-1">
+                    <input
+                      type="url"
+                      value={formData.imageUrlInput}
+                      onChange={(e) => setFormData({ ...formData, imageUrlInput: e.target.value })}
+                      placeholder="বা ছবির সরাসরি লিংক পেস্ট করুন (Paste image URL: https://...)"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-[#0052FF]"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formData.imageUrlInput.trim()) {
+                        setFormData({
+                          ...formData,
+                          images: [...formData.images, formData.imageUrlInput.trim()],
+                          imageUrlInput: '',
+                        });
+                      }
+                    }}
+                    disabled={!formData.imageUrlInput.trim()}
+                    className="px-3.5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs disabled:opacity-50 cursor-pointer"
+                  >
+                    Add URL
+                  </button>
+                </div>
+
+                {/* Previews and Image Deletion Grid */}
+                {formData.images.length > 0 ? (
+                  <div className="space-y-1.5 pt-1.5">
+                    <div className="text-[11px] font-semibold text-slate-600 flex items-center justify-between">
+                      <span>সংযুক্ত ছবি ({formData.images.length}) · প্রথম ছবিটি ওয়েবসাইটে প্রদর্শিত হবে</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {formData.images.map((imgUrl, idx) => (
+                        <div
+                          key={idx}
+                          className="relative group aspect-square rounded-xl border border-slate-200 bg-white overflow-hidden flex items-center justify-center p-1.5 shadow-2xs"
+                        >
+                          <img
+                            src={imgUrl}
+                            alt={`Product preview ${idx + 1}`}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/logo.png';
+                            }}
+                          />
+
+                          {/* Primary Cover Badge */}
+                          {idx === 0 && (
+                            <span className="absolute top-1.5 left-1.5 bg-[#0052FF] text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-xs">
+                              Main
+                            </span>
+                          )}
+
+                          {/* Red Delete/Remove Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFormData({
+                                ...formData,
+                                images: formData.images.filter((_, i) => i !== idx),
+                              });
+                            }}
+                            title="ছবি রিমুভ করুন (Remove this image)"
+                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-sm transition-transform hover:scale-110 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Set as Cover button if secondary image */}
+                          {idx !== 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newImgs = [...formData.images];
+                                const [selected] = newImgs.splice(idx, 1);
+                                newImgs.unshift(selected);
+                                setFormData({ ...formData, images: newImgs });
+                              }}
+                              className="absolute bottom-1.5 inset-x-1.5 py-1 rounded bg-slate-900/80 hover:bg-slate-900 text-white text-[10px] font-bold text-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            >
+                              মেইন ছবি করুন
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-amber-800 text-[11px] flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
+                    <span>কোনো ছবি যুক্ত নেই। ছবি আপলোড করতে উপরে ড্র্যাগ করুন বা ক্লিক করুন।</span>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

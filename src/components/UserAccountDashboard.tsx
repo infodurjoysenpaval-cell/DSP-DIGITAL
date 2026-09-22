@@ -984,9 +984,12 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                           {order.items.map((item, idx) => (
                             <div key={idx} className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-slate-100">
                               <img
-                                src={item.product.images[0]}
+                                src={item.product.images?.[0] || '/logo.png'}
                                 alt={item.product.name}
                                 className="w-12 h-12 object-contain rounded-lg bg-slate-50 p-1 border border-slate-200 shrink-0"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/logo.png';
+                                }}
                               />
                               <div className="flex-1 min-w-0">
                                 <h4 className="text-xs font-bold text-slate-800 truncate">

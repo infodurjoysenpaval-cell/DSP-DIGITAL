@@ -142,15 +142,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div className="space-y-3">
               <div className="aspect-square bg-slate-50 rounded-2xl border border-slate-200 p-4 flex items-center justify-center overflow-hidden">
                 <img
-                  src={selectedImage || product.images[0]}
+                  src={selectedImage || product.images?.[0] || '/logo.png'}
                   alt={product.name}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/logo.png';
+                  }}
                 />
               </div>
 
               {/* Thumbnails */}
-              {product.images.length > 1 && (
+              {product.images && product.images.length > 1 && (
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {product.images.map((img, i) => (
                     <button

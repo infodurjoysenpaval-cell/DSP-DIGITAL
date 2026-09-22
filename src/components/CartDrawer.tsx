@@ -99,10 +99,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     className="flex gap-3 pb-4 border-b border-slate-100 last:border-0 items-start"
                   >
                     <img
-                      src={item.product.images[0]}
+                      src={item.product.images?.[0] || '/logo.png'}
                       alt={item.product.name}
                       referrerPolicy="no-referrer"
                       className="w-16 h-16 rounded-xl object-cover border border-slate-100 shrink-0 bg-slate-50"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/logo.png';
+                      }}
                     />
 
                     <div className="flex-1 min-w-0">

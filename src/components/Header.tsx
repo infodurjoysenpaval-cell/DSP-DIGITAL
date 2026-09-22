@@ -309,10 +309,13 @@ export const Header: React.FC<HeaderProps> = ({
                               className="w-full text-left px-4 py-2.5 hover:bg-blue-50/70 flex items-center gap-3 transition-colors group"
                             >
                               <img
-                                src={prod.images[0]}
+                                src={prod.images?.[0] || '/logo.png'}
                                 alt={prod.name}
                                 referrerPolicy="no-referrer"
                                 className="w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0 group-hover:scale-105 transition-transform"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/logo.png';
+                                }}
                               />
                               <div className="flex-1 min-w-0">
                                 <h4 className="text-xs sm:text-sm font-sub-heading text-slate-800 truncate group-hover:text-blue-600">
@@ -563,10 +566,13 @@ export const Header: React.FC<HeaderProps> = ({
                               className="w-full text-left px-3.5 py-2 hover:bg-blue-50/70 flex items-center gap-2.5 transition-colors group"
                             >
                               <img
-                                src={prod.images[0]}
+                                src={prod.images?.[0] || '/logo.png'}
                                 alt={prod.name}
                                 referrerPolicy="no-referrer"
                                 className="w-9 h-9 object-cover rounded-lg border border-slate-200 shrink-0"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/logo.png';
+                                }}
                               />
                               <div className="flex-1 min-w-0">
                                 <h4 className="text-xs font-semibold text-slate-800 truncate">

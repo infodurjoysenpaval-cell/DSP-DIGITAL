@@ -1,4 +1,5 @@
 import React from 'react';
+import { Package } from 'lucide-react';
 import { Product, VariationItem } from '../types';
 
 interface ProductCardProps {
@@ -71,13 +72,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         )}
 
-        <img
-          src={product.images[0]}
-          alt={product.name}
-          referrerPolicy="no-referrer"
-          loading="lazy"
-          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-        />
+        {product.images && product.images.length > 0 && product.images[0] ? (
+          <img
+            src={product.images[0]}
+            alt={product.name}
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/logo.png';
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50/80 text-slate-300 p-4">
+            <Package className="w-10 h-10 stroke-[1.5] text-slate-300" />
+            <span className="text-[10px] text-slate-400 mt-1 font-medium">No Image</span>
+          </div>
+        )}
       </div>
 
       {/* Details Container */}
