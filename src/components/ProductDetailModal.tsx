@@ -203,7 +203,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </h1>
 
                 {/* Pricing Display */}
-                <div className="mt-3 p-3 bg-white rounded-2xl border border-slate-200 flex items-baseline flex-wrap gap-2.5">
+                <div className="mt-3 flex items-baseline flex-wrap gap-2.5">
                   <span className="text-2xl sm:text-3xl font-black text-[#2563EB]">
                     ৳ {salePrice.toLocaleString()}
                   </span>

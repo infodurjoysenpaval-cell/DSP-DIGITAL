@@ -4,8 +4,8 @@
  */
 export const compressImageFile = (
   file: File,
-  maxDimension = 1000,
-  quality = 0.82
+  maxDimension = 800,
+  quality = 0.76
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     // If it's an SVG file, data URL directly
@@ -58,6 +58,20 @@ export const compressImageFile = (
           if (!compressed.startsWith('data:image/webp')) {
             compressed = canvas.toDataURL('image/jpeg', quality);
           }
+
+          // If still over 150KB, compress further to 550px / 0.68
+          if (compressed.length > 200000) {
+            const smallerCanvas = document.createElement('canvas');
+            const scale = 550 / Math.max(width, height);
+            smallerCanvas.width = Math.round(width * scale);
+            smallerCanvas.height = Math.round(height * scale);
+            const sCtx = smallerCanvas.getContext('2d');
+            if (sCtx) {
+              sCtx.drawImage(canvas, 0, 0, smallerCanvas.width, smallerCanvas.height);
+              compressed = smallerCanvas.toDataURL('image/jpeg', 0.68);
+            }
+          }
+
           resolve(compressed);
         } catch (err) {
           // Fallback to original image data URL

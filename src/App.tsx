@@ -319,16 +319,25 @@ export default function App() {
       if (selectedCategory) {
         const catSlug = typeof prod.category === 'object' && prod.category !== null
           ? prod.category.slug
+          : typeof prod.category === 'string'
+          ? prod.category.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
           : prod.categories?.[0]?.slug;
 
-        const matchesCat = catSlug === selectedCategory ||
-          (typeof prod.category === 'string' && prod.category === selectedCategory);
+        const catName = typeof prod.category === 'object' && prod.category !== null
+          ? prod.category.name?.toLowerCase()
+          : typeof prod.category === 'string'
+          ? prod.category.toLowerCase()
+          : '';
 
-        if (!matchesCat) {
-          // Check categories array
-          const inCategories = prod.categories?.some((c) => c.slug === selectedCategory);
-          if (!inCategories) return false;
-        }
+        const matchesCat =
+          catSlug === selectedCategory ||
+          catName === selectedCategory.toLowerCase() ||
+          (typeof prod.category === 'string' && prod.category === selectedCategory) ||
+          prod.categories?.some(
+            (c) => c.slug === selectedCategory || c.name?.toLowerCase() === selectedCategory.toLowerCase()
+          );
+
+        if (!matchesCat) return false;
       }
 
       // Tag filter

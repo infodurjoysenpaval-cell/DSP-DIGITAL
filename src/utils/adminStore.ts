@@ -3,6 +3,9 @@ import { PRODUCTS, SHOP_INFO } from '../data/storeData';
 import { getRegisteredUsers, getUserOrders } from './authStorage';
 
 const LIVE_PRODUCTS_KEY = 'dsp_live_products_v1';
+const CUSTOM_PRODUCTS_KEY = 'dsp_custom_products_v1';
+const DELETED_PRODUCT_IDS_KEY = 'dsp_deleted_prod_ids_v1';
+const MODIFIED_PRODUCTS_KEY = 'dsp_modified_products_v1';
 const THEME_CONFIG_KEY = 'dsp_theme_config_v1';
 const STORE_SETTINGS_KEY = 'dsp_store_settings_v1';
 const VENDOR_ADMINS_KEY = 'dsp_vendor_admins_v1';
@@ -387,43 +390,136 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 };
 
 // ---------------- PRODUCTS ----------------
-export const syncInitialProducts = (defaults: Product[]) => {
+let memoryProductsCache: Product[] | null = null;
+
+export const getCustomProducts = (): Product[] => {
   try {
-    const raw = localStorage.getItem(LIVE_PRODUCTS_KEY);
-    if (!raw) {
-      localStorage.setItem(LIVE_PRODUCTS_KEY, JSON.stringify(defaults));
-    }
-  } catch (e) {}
+    const raw = localStorage.getItem(CUSTOM_PRODUCTS_KEY) || sessionStorage.getItem(CUSTOM_PRODUCTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const getDeletedProductIds = (): string[] => {
+  try {
+    const raw = localStorage.getItem(DELETED_PRODUCT_IDS_KEY) || sessionStorage.getItem(DELETED_PRODUCT_IDS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const getModifiedProducts = (): Record<string, Partial<Product>> => {
+  try {
+    const raw = localStorage.getItem(MODIFIED_PRODUCTS_KEY) || sessionStorage.getItem(MODIFIED_PRODUCTS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+export const syncInitialProducts = (defaults: Product[]) => {
+  if (!memoryProductsCache) {
+    getLiveProducts();
+  }
 };
 
 export const getLiveProducts = (): Product[] => {
+  if (memoryProductsCache && Array.isArray(memoryProductsCache) && memoryProductsCache.length > 0) {
+    return memoryProductsCache;
+  }
+
   try {
-    const raw = localStorage.getItem(LIVE_PRODUCTS_KEY);
-    if (!raw) {
-      localStorage.setItem(LIVE_PRODUCTS_KEY, JSON.stringify(PRODUCTS));
-      return PRODUCTS;
+    const deletedIds = new Set(getDeletedProductIds());
+    const modifiedMap = getModifiedProducts();
+    const customList = getCustomProducts();
+
+    // 1. Try reading the full stored list from localStorage or sessionStorage
+    const raw = localStorage.getItem(LIVE_PRODUCTS_KEY) || sessionStorage.getItem(LIVE_PRODUCTS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Exclude any deleted IDs
+        let list = parsed.filter((p: Product) => !deletedIds.has(p._id));
+        
+        // Ensure all custom products are present
+        for (const cp of customList) {
+          if (!deletedIds.has(cp._id) && !list.some((p: Product) => p._id === cp._id)) {
+            list.unshift(cp);
+          }
+        }
+
+        memoryProductsCache = list;
+        return list;
+      }
     }
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+
+    // 2. Reconstruct from default PRODUCTS + customList - deletedIds + modifiedMap
+    let list: Product[] = PRODUCTS.filter((p) => !deletedIds.has(p._id)).map((p) => {
+      if (modifiedMap[p._id]) {
+        return { ...p, ...modifiedMap[p._id] };
+      }
+      return p;
+    });
+
+    for (const cp of customList) {
+      if (!deletedIds.has(cp._id) && !list.some((p) => p._id === cp._id)) {
+        list.unshift(cp);
+      }
     }
-    return PRODUCTS;
+
+    memoryProductsCache = list;
+    return list;
   } catch (e) {
+    memoryProductsCache = PRODUCTS;
     return PRODUCTS;
   }
 };
 
 export const saveLiveProducts = (products: Product[]) => {
+  memoryProductsCache = [...products];
+
+  const defaultIdSet = new Set(PRODUCTS.map((p) => p._id));
+  const currentIdSet = new Set(products.map((p) => p._id));
+
+  // Find user-created products
+  const customProducts = products.filter((p) => !defaultIdSet.has(p._id) || p._id.startsWith('prod_'));
+
+  // Find deleted default products
+  const deletedDefaultIds = PRODUCTS.filter((p) => !currentIdSet.has(p._id)).map((p) => p._id);
+  const allDeletedIds = Array.from(new Set([...getDeletedProductIds(), ...deletedDefaultIds]));
+  // If a product was re-added or is currently in products, un-delete it
+  const finalDeletedIds = allDeletedIds.filter((id) => !currentIdSet.has(id));
+
+  // Save lightweight deltas (tiny footprint, guaranteed to never fail)
+  try {
+    localStorage.setItem(CUSTOM_PRODUCTS_KEY, JSON.stringify(customProducts));
+    sessionStorage.setItem(CUSTOM_PRODUCTS_KEY, JSON.stringify(customProducts));
+  } catch (e) {
+    console.warn('Failed saving custom products delta', e);
+  }
+
+  try {
+    localStorage.setItem(DELETED_PRODUCT_IDS_KEY, JSON.stringify(finalDeletedIds));
+    sessionStorage.setItem(DELETED_PRODUCT_IDS_KEY, JSON.stringify(finalDeletedIds));
+  } catch (e) {
+    console.warn('Failed saving deleted ids delta', e);
+  }
+
+  // Attempt to save the full list in localStorage & sessionStorage
   try {
     localStorage.setItem(LIVE_PRODUCTS_KEY, JSON.stringify(products));
-    window.dispatchEvent(new Event('dsp_products_updated'));
   } catch (e) {
-    console.error('Failed to save live products', e);
-    try {
-      sessionStorage.setItem(LIVE_PRODUCTS_KEY, JSON.stringify(products));
-    } catch {}
-    window.dispatchEvent(new Event('dsp_products_updated'));
+    console.warn('Full products exceeded localStorage quota; relying on delta storage.', e);
   }
+
+  try {
+    sessionStorage.setItem(LIVE_PRODUCTS_KEY, JSON.stringify(products));
+  } catch {}
+
+  // Broadcast event to all components
+  window.dispatchEvent(new Event('dsp_products_updated'));
 };
 
 export const addLiveProduct = (newProd: Partial<Product>): Product => {
@@ -432,32 +528,52 @@ export const addLiveProduct = (newProd: Partial<Product>): Product => {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
-  
+
+  const catName = typeof newProd.category === 'string'
+    ? newProd.category
+    : (newProd.category?.name || 'Ai Tools');
+
+  const catSlug = (typeof newProd.category === 'object' && newProd.category?.slug)
+    ? newProd.category.slug
+    : catName.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+  const categoryObj = {
+    _id: `cat_${catSlug}`,
+    name: catName,
+    slug: catSlug,
+  };
+
+  const createdId = `prod_${Date.now()}_${Math.floor(100 + Math.random() * 900)}`;
+
   const created: Product = {
-    _id: `prod_${Date.now()}`,
+    _id: createdId,
     name: newProd.name || 'New Product',
-    slug: `${slug}-${Math.floor(100 + Math.random() * 900)}`,
-    images: Array.isArray(newProd.images)
+    slug: `${slug}-${Math.floor(1000 + Math.random() * 9000)}`,
+    images: Array.isArray(newProd.images) && newProd.images.length > 0
       ? newProd.images
-      : newProd.images
-      ? [newProd.images]
-      : [],
-    salePrice: newProd.salePrice ?? 500,
-    regularPrice: newProd.regularPrice ?? 800,
-    category: newProd.category || 'Software',
+      : ['/logo.png'],
+    salePrice: Number(newProd.salePrice ?? 500),
+    regularPrice: Number(newProd.regularPrice ?? 800),
     isVariation: false,
-    description: newProd.description || 'Official digital license product with instant delivery.',
+    description: newProd.description || 'Official genuine digital license product with instant delivery & 100% guarantee.',
+    tags: [
+      { _id: 'tag_new', name: 'New Arrivals', slug: 'new-arrivals' },
+      { _id: 'tag_flash', name: 'Flash Sale', slug: 'flash-sale' },
+    ],
     shortDescription: newProd.shortDescription || 'Instant Delivery in Bangladesh',
     totalSold: 0,
     ratingCount: 5,
     ratingTotal: 25,
-    isPublished: true,
-    stock: newProd.stock ?? 100,
-    openingStock: newProd.openingStock ?? 100,
+    isPublished: newProd.isPublished !== false,
+    stock: Number(newProd.stock ?? 100),
+    openingStock: Number(newProd.openingStock ?? 100),
     ...newProd,
+    category: categoryObj,
+    categories: [categoryObj],
   };
 
-  const updated = [created, ...current];
+  // Prepend new product so it appears at top of admin & store
+  const updated = [created, ...current.filter((p) => p._id !== createdId)];
   saveLiveProducts(updated);
   return created;
 };
@@ -466,14 +582,70 @@ export const updateLiveProduct = (id: string, updates: Partial<Product>): boolea
   const current = getLiveProducts();
   const index = current.findIndex((p) => p._id === id);
   if (index === -1) return false;
-  current[index] = { ...current[index], ...updates };
-  saveLiveProducts(current);
+
+  let categoryObj = current[index].category;
+  if (updates.category) {
+    const catName = typeof updates.category === 'string'
+      ? updates.category
+      : (updates.category?.name || 'Software');
+    const catSlug = (typeof updates.category === 'object' && updates.category?.slug)
+      ? updates.category.slug
+      : catName.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    categoryObj = {
+      _id: `cat_${catSlug}`,
+      name: catName,
+      slug: catSlug,
+    };
+  }
+
+  current[index] = {
+    ...current[index],
+    ...updates,
+    ...(updates.category ? { category: categoryObj, categories: [categoryObj as any] } : {}),
+  };
+
+  // Update modified map if default product
+  const defaultProduct = PRODUCTS.find((p) => p._id === id);
+  if (defaultProduct) {
+    try {
+      const modifiedMap = getModifiedProducts();
+      modifiedMap[id] = {
+        name: current[index].name,
+        salePrice: current[index].salePrice,
+        regularPrice: current[index].regularPrice,
+        stock: current[index].stock,
+        isPublished: current[index].isPublished,
+        images: current[index].images,
+        category: current[index].category,
+        shortDescription: current[index].shortDescription,
+        description: current[index].description,
+      };
+      localStorage.setItem(MODIFIED_PRODUCTS_KEY, JSON.stringify(modifiedMap));
+    } catch {}
+  }
+
+  saveLiveProducts([...current]);
   return true;
 };
 
 export const deleteLiveProduct = (id: string): boolean => {
   const current = getLiveProducts();
   const filtered = current.filter((p) => p._id !== id);
+
+  // If custom product, remove from custom list
+  try {
+    const customList = getCustomProducts().filter((p) => p._id !== id);
+    localStorage.setItem(CUSTOM_PRODUCTS_KEY, JSON.stringify(customList));
+    sessionStorage.setItem(CUSTOM_PRODUCTS_KEY, JSON.stringify(customList));
+  } catch {}
+
+  // Add to deleted IDs list
+  try {
+    const deletedIds = Array.from(new Set([...getDeletedProductIds(), id]));
+    localStorage.setItem(DELETED_PRODUCT_IDS_KEY, JSON.stringify(deletedIds));
+    sessionStorage.setItem(DELETED_PRODUCT_IDS_KEY, JSON.stringify(deletedIds));
+  } catch {}
+
   saveLiveProducts(filtered);
   return true;
 };

@@ -35,28 +35,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
     : 0;
 
-  // Price range if variations exist
-  let priceDisplay = `৳ ${salePrice.toLocaleString()}`;
-  let hasPriceRange = false;
-
+  // Single unified starting sale price for the card (একক মূল্য)
+  let displayPrice = salePrice;
   if (hasVariations && product.variationList && product.variationList.length > 0) {
     const salePrices = product.variationList.map((v) => v.salePrice).filter((p) => p > 0);
     if (salePrices.length > 0) {
-      const minP = Math.min(...salePrices);
-      const maxP = Math.max(...salePrices);
-      if (minP < maxP) {
-        priceDisplay = `৳ ${minP.toLocaleString()} – ৳ ${maxP.toLocaleString()}`;
-        hasPriceRange = true;
-      } else {
-        priceDisplay = `৳ ${minP.toLocaleString()}`;
-      }
+      displayPrice = Math.min(...salePrices);
     }
   }
+
+  const finalSalePrice = isAffiliate ? Math.round(displayPrice * 0.85) : displayPrice;
+  const priceDisplay = `৳ ${finalSalePrice.toLocaleString()}`;
 
   return (
     <div
       id={`product-card-${product._id}`}
-      className="group bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md transition-all duration-300 flex flex-col overflow-hidden relative"
+      className="group bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md transition-all duration-300 flex flex-col overflow-hidden relative h-full"
     >
       {/* Image Container with Discount Badge */}
       <div
@@ -97,33 +91,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {/* Product Name */}
           <h3
             onClick={() => onViewProduct(product)}
-            className="text-xs sm:text-sm font-normal text-slate-900 group-hover:text-[#2563EB] transition-colors line-clamp-2 min-h-[2.5rem] leading-snug cursor-pointer"
+            className="text-xs sm:text-sm font-normal text-slate-900 group-hover:text-[#2563EB] transition-colors line-clamp-2 h-9 sm:h-10 leading-snug cursor-pointer overflow-hidden"
             title={product.name}
           >
             {product.name}
           </h3>
 
-          {/* Pricing Row */}
-          <div className="text-center my-2.5 sm:my-3 flex flex-col items-center justify-center gap-0.5">
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                {priceDisplay}
-              </span>
-              {isAffiliate ? (
-                <span className="text-xs sm:text-sm font-normal text-slate-400 line-through">
-                  ৳ {baseSalePrice.toLocaleString()}
-                </span>
-              ) : (
-                regularPrice > salePrice && !hasPriceRange && (
-                  <span className="text-xs sm:text-sm font-normal text-slate-400 line-through">
-                    ৳ {regularPrice.toLocaleString()}
-                  </span>
-                )
-              )}
-            </div>
+          {/* Pricing Row - Clean Single Price (একক মূল্য) */}
+          <div className="text-center my-2 sm:my-2.5 flex flex-col items-center justify-center gap-0.5">
+            <span className="text-base sm:text-lg font-bold text-slate-900 tracking-tight font-price">
+              {priceDisplay}
+            </span>
             {isAffiliate && (
               <span className="text-[10px] text-[#EA580C] font-semibold">
-                (১৫% অ্যাফিলিয়েট ডিসকাউন্ট অন্তর্ভুক্ত)
+                (১৫% অ্যাফিলিয়েট ডিসকাউন্ট)
               </span>
             )}
           </div>

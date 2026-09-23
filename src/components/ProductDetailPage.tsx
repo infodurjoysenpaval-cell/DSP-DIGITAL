@@ -217,7 +217,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           <div className="lg:col-span-6 space-y-4">
             <div
               id="product-image-container"
-              className="relative rounded-3xl bg-[#0F172A] border border-slate-200 overflow-hidden shadow-sm flex items-center justify-center p-4 sm:p-6 min-h-[380px] sm:min-h-[440px]"
+              className="relative rounded-2xl sm:rounded-3xl bg-white overflow-hidden flex items-center justify-center p-2 sm:p-3"
             >
               {/* HOT / FLASH Badge Matching Image Top-Left */}
               {isHot ? (
@@ -237,7 +237,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 src={selectedImage || product.images?.[0] || '/logo.png'}
                 alt={product.name}
                 referrerPolicy="no-referrer"
-                className="w-full h-auto max-h-[440px] object-contain rounded-2xl select-none transition-all duration-300"
+                className="w-full h-auto max-h-[460px] object-contain rounded-xl select-none transition-all duration-300"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =
                     product.images?.[0] || '/logo.png';

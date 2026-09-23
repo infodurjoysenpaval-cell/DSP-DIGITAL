@@ -15,6 +15,8 @@ import {
   UploadCloud,
   Loader2,
   Package,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 import { Product } from '../../types';
 import {
@@ -40,9 +42,13 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
   // Edit / Add Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
   const [formData, setFormData] = useState({
     name: '',
-    category: 'Software License',
+    category: 'Ai Tools',
     salePrice: 500,
     regularPrice: 800,
     stock: 100,
@@ -144,9 +150,10 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
 
   const handleOpenAddModal = () => {
     setEditingProduct(null);
+    setFormError(null);
     setFormData({
       name: '',
-      category: 'Software License',
+      category: 'Ai Tools',
       salePrice: 500,
       regularPrice: 800,
       stock: 100,
@@ -162,15 +169,20 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
 
   const handleOpenEditModal = (p: Product) => {
     setEditingProduct(p);
+    setFormError(null);
     const existingImages = Array.isArray(p.images)
       ? p.images.filter((img) => typeof img === 'string' && img.trim().length > 0)
       : typeof p.images === 'string' && (p.images as string).trim().length > 0
       ? [p.images]
       : [];
 
+    const catName = typeof p.category === 'string'
+      ? p.category
+      : p.category?.name || 'Ai Tools';
+
     setFormData({
       name: p.name,
-      category: typeof p.category === 'string' ? p.category : p.category?.name || 'Software',
+      category: catName,
       salePrice: p.salePrice ?? 0,
       regularPrice: p.regularPrice ?? 0,
       stock: p.stock ?? 100,
@@ -184,17 +196,29 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
     setIsModalOpen(true);
   };
 
-  const handleDeleteProduct = (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
-      deleteLiveProduct(id);
-      reloadProducts();
-    }
+  const handleDeleteProduct = (prod: Product) => {
+    setProductToDelete(prod);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!productToDelete) return;
+    const name = productToDelete.name;
+    deleteLiveProduct(productToDelete._id);
+    setProductToDelete(null);
+    reloadProducts();
+    setToastMessage({
+      text: `"${name}" সফলভাবে ডিলিট করা হয়েছে!`,
+      type: 'success',
+    });
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+
     if (!formData.name.trim()) {
-      alert('Please enter product name');
+      setFormError('দয়া করে প্রোডাক্টের নাম লিখুন (Product name is required)');
       return;
     }
 
@@ -202,36 +226,47 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
       (img) => typeof img === 'string' && img.trim().length > 0
     );
 
+    const safeImages = finalImages.length > 0 ? finalImages : ['/logo.png'];
+
     if (editingProduct) {
       updateLiveProduct(editingProduct._id, {
-        name: formData.name,
+        name: formData.name.trim(),
         category: formData.category,
         salePrice: Number(formData.salePrice),
         regularPrice: Number(formData.regularPrice),
         stock: Number(formData.stock),
         openingStock: Number(formData.openingStock),
-        images: finalImages,
+        images: safeImages,
         shortDescription: formData.shortDescription,
         description: formData.description,
         isPublished: formData.isPublished,
       });
+      setToastMessage({
+        text: `"${formData.name.trim()}" সফলভাবে আপডেট করা হয়েছে!`,
+        type: 'success',
+      });
     } else {
       addLiveProduct({
-        name: formData.name,
+        name: formData.name.trim(),
         category: formData.category,
         salePrice: Number(formData.salePrice),
         regularPrice: Number(formData.regularPrice),
         stock: Number(formData.stock),
         openingStock: Number(formData.openingStock),
-        images: finalImages,
+        images: safeImages,
         shortDescription: formData.shortDescription,
         description: formData.description,
         isPublished: formData.isPublished,
+      });
+      setToastMessage({
+        text: `"${formData.name.trim()}" প্রোডাক্টটি সফলভাবে যুক্ত ও আপলোড করা হয়েছে!`,
+        type: 'success',
       });
     }
 
     setIsModalOpen(false);
     reloadProducts();
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   return (
@@ -412,7 +447,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
                       <span>Edit</span>
                     </button>
                     <button
-                      onClick={() => handleDeleteProduct(prod._id, prod.name)}
+                      onClick={() => handleDeleteProduct(prod)}
                       title="Delete"
                       className="p-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50"
                     >
@@ -559,9 +594,9 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => handleDeleteProduct(prod._id, prod.name)}
+                            onClick={() => handleDeleteProduct(prod)}
                             title="Delete"
-                            className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -627,10 +662,19 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    if (formError) setFormError(null);
+                  }}
                   placeholder="e.g. Windows 11 Pro Genuine Retail License Key"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#0052FF]"
                 />
+                {formError && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{formError}</span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -640,13 +684,20 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#0052FF]"
                 >
+                  <option value="Ai Tools">Ai Tools</option>
+                  <option value="Subscriptions">Subscriptions</option>
+                  <option value="Verified Accounts">Verified Accounts</option>
+                  <option value="All Gift Cards">All Gift Cards</option>
+                  <option value="VPN & Online Security">VPN & Online Security</option>
+                  <option value="Windows Utility Key">Windows Utility Key</option>
+                  <option value="Premium Software">Premium Software</option>
+                  <option value="Education & Learning Tools">Education & Learning Tools</option>
+                  <option value="Digital Marketing & Social Media Services">Digital Marketing & Social Media Services</option>
                   <option value="Operating System">Operating System</option>
                   <option value="Office & Productivity">Office & Productivity</option>
                   <option value="Antivirus & Security">Antivirus & Security</option>
-                  <option value="Design & Multimedia">Design & Multimedia</option>
-                  <option value="VPN & Streaming">VPN & Streaming</option>
                   <option value="Software License">Software License</option>
-                  <option value="Education & Learning Tools">Education & Learning Tools</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
 
@@ -931,6 +982,88 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal (Replaces blocked window.confirm) */}
+      {productToDelete && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+              <Trash2 className="w-7 h-7" />
+            </div>
+
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 font-main-heading">
+                প্রোডাক্ট ডিলিট নিশ্চিত করুন
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Confirm Product Deletion
+              </p>
+            </div>
+
+            {/* Product Snapshot Card */}
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center gap-3 text-left">
+              <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                {productToDelete.images?.[0] ? (
+                  <img
+                    src={productToDelete.images[0]}
+                    alt={productToDelete.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/logo.png';
+                    }}
+                  />
+                ) : (
+                  <Package className="w-6 h-6 text-slate-400" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-slate-900 line-clamp-1">
+                  {productToDelete.name}
+                </p>
+                <p className="text-[11px] font-semibold text-rose-600 mt-0.5">
+                  ৳{productToDelete.salePrice}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed px-2">
+              আপনি কি সত্যিই এই প্রোডাক্টটি ওয়েবসাইট থেকে মুছে ফেলতে চান? প্রোডাক্টটি ওয়েবসাইট এবং ডাটাবেজ থেকে স্থায়ীভাবে মুছে ফেলা হবে।
+            </p>
+
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setProductToDelete(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 font-bold text-slate-700 text-xs transition-colors cursor-pointer"
+              >
+                বাতিল করুন (Cancel)
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>ডিলিট করুন (Delete)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Action Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-slate-900 text-white shadow-2xl text-xs font-bold border border-slate-800 animate-in slide-in-from-top-3">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage.text}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="ml-2 text-slate-400 hover:text-white cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
     </div>
