@@ -22,6 +22,7 @@ import {
   Copy,
   DollarSign,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { AffiliateApplication } from '../../types';
 import {
@@ -42,12 +43,18 @@ export const AdminAffiliates: React.FC = () => {
   >('all');
   const [selectedAppForDoc, setSelectedAppForDoc] = useState<AffiliateApplication | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const reload = () => {
+  const reload = (showSpinner = false) => {
+    if (showSpinner) setIsSyncing(true);
     setApplications(getAffiliateApplications());
-    syncAffiliatesFromServer().then((loaded) => {
-      if (loaded && Array.isArray(loaded)) setApplications(loaded);
-    });
+    syncAffiliatesFromServer()
+      .then((loaded) => {
+        if (loaded && Array.isArray(loaded)) setApplications(loaded);
+      })
+      .finally(() => {
+        if (showSpinner) setTimeout(() => setIsSyncing(false), 500);
+      });
   };
 
   useEffect(() => {
@@ -58,13 +65,21 @@ export const AdminAffiliates: React.FC = () => {
     window.addEventListener('dsp_affiliate_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
-    // Real-time listener for Firestore Affiliates
+    // Real-time listener for Firestore Affiliates with merge
     let unsubscribeFirestore: (() => void) | null = null;
     try {
       unsubscribeFirestore = listenAffiliatesFromFirestore((firestoreAffs) => {
-        if (firestoreAffs && Array.isArray(firestoreAffs) && firestoreAffs.length > 0) {
-          setApplications(firestoreAffs);
-          localStorage.setItem('dsp_affiliate_applications', JSON.stringify(firestoreAffs));
+        if (firestoreAffs && Array.isArray(firestoreAffs)) {
+          setApplications((prev) => {
+            const map = new Map<string, AffiliateApplication>();
+            prev.forEach((a) => map.set(a.id, a));
+            firestoreAffs.forEach((a) => map.set(a.id, { ...map.get(a.id), ...a }));
+            const merged = Array.from(map.values());
+            try {
+              localStorage.setItem('dsp_affiliate_applications', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
         }
       });
     } catch {}
@@ -79,7 +94,7 @@ export const AdminAffiliates: React.FC = () => {
       syncAffiliatesFromServer().then((loaded) => {
         if (loaded && Array.isArray(loaded)) setApplications(loaded);
       });
-    }, 6000);
+    }, 5000);
 
     return () => {
       window.removeEventListener('dsp_affiliate_updated', handleUpdate);
@@ -162,15 +177,28 @@ export const AdminAffiliates: React.FC = () => {
           </p>
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search by Name, Phone, Ref Code..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#0052FF]"
-          />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => reload(true)}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
+            title="ক্লাউড থেকে নতুন আবেদন রিফ্রেশ করুন"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-[#0052FF] ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'সিঙ্ক হচ্ছে...' : 'রিফ্রেশ'}</span>
+          </button>
+
+          <div className="relative flex-1 sm:w-72">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search by Name, Phone, Ref Code..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#0052FF]"
+            />
+          </div>
         </div>
       </div>
 

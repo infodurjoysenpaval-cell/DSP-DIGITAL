@@ -53,6 +53,8 @@ import {
   requestAffiliatePayout,
   updateAffiliateStatus,
 } from '../utils/affiliateStorage';
+import { compressDocumentImage } from '../utils/imageCompress';
+import { syncUserToFirestore } from '../utils/firebase';
 import { AffiliateApplication } from '../types';
 import { SHOP_INFO } from '../data/storeData';
 import { getLiveProducts } from '../utils/adminStore';
@@ -249,26 +251,37 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check size limit ~5MB
-    if (file.size > 5 * 1024 * 1024) {
-      setAffiliateMsg({ type: 'error', text: 'Document size must be less than 5MB.' });
+    // Check size limit ~10MB
+    if (file.size > 10 * 1024 * 1024) {
+      setAffiliateMsg({ type: 'error', text: 'Document size must be less than 10MB.' });
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      const sizeInKb = (file.size / 1024).toFixed(0);
-      const sizeStr = file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${sizeInKb} KB`;
-      setAffiliateForm((prev) => ({
-        ...prev,
-        documentUrl: base64,
-        documentName: file.name,
-        documentType: file.type,
-        documentSize: sizeStr,
-      }));
-    };
-    reader.readAsDataURL(file);
+    compressDocumentImage(file)
+      .then((res) => {
+        setAffiliateForm((prev) => ({
+          ...prev,
+          documentUrl: res.dataUrl,
+          documentName: file.name,
+          documentType: file.type,
+          documentSize: res.sizeFormatted,
+        }));
+      })
+      .catch(() => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          const sizeInKb = (file.size / 1024).toFixed(0);
+          setAffiliateForm((prev) => ({
+            ...prev,
+            documentUrl: base64,
+            documentName: file.name,
+            documentType: file.type,
+            documentSize: `${sizeInKb} KB`,
+          }));
+        };
+        reader.readAsDataURL(file);
+      });
   };
 
   const handleRemoveDocument = () => {
@@ -316,10 +329,19 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
       try {
         localStorage.setItem(`dsp_affiliate_app_${currentUser.id}`, JSON.stringify(applicationData));
       } catch (err) {
-        console.error('Failed to save affiliate app', err);
+        console.warn('Local affiliate cache notice:', err);
       }
 
-      // Also save to shared admin applications store
+      // Update current user affiliateStatus in Firestore
+      const updatedUser: UserProfile = {
+        ...currentUser,
+        affiliateStatus: 'pending',
+        isAffiliate: false,
+      };
+      syncUserToFirestore(updatedUser).catch(() => {});
+      onUserChange?.(updatedUser);
+
+      // Save to shared admin applications store (synced to Firestore & server)
       saveAffiliateApplication({
         userId: currentUser.id,
         fullName: affiliateForm.fullName,
@@ -343,7 +365,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
         type: 'success',
         text: 'Your application has been submitted successfully! Our admin team will review your documents and approve your account.',
       });
-    }, 600);
+    }, 500);
   };
 
   // Orders calculation

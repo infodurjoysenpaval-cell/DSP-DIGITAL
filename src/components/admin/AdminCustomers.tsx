@@ -13,6 +13,7 @@ import {
   Shield,
   Phone,
   Clock,
+  RefreshCw,
 } from 'lucide-react';
 import { getRegisteredUsers, registerUser, fetchUsersFromServer, StoredUserAccount } from '../../utils/authStorage';
 import { listenUsersFromFirestore, deleteUserFromFirestore } from '../../utils/firebase';
@@ -31,14 +32,20 @@ export const AdminCustomers: React.FC = () => {
     avatar: '',
   });
   const [msg, setMsg] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const reloadUsers = () => {
+  const reloadUsers = (showSpinner = false) => {
+    if (showSpinner) setIsSyncing(true);
     setUsers(getRegisteredUsers());
-    fetchUsersFromServer().then((loaded) => {
-      if (loaded && Array.isArray(loaded) && loaded.length > 0) {
-        setUsers(loaded);
-      }
-    });
+    fetchUsersFromServer()
+      .then((loaded) => {
+        if (loaded && Array.isArray(loaded)) {
+          setUsers(loaded);
+        }
+      })
+      .finally(() => {
+        if (showSpinner) setTimeout(() => setIsSyncing(false), 500);
+      });
   };
 
   useEffect(() => {
@@ -51,13 +58,29 @@ export const AdminCustomers: React.FC = () => {
     window.addEventListener('dsp_users_changed', handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
-    // Subscribe to Firestore Users in real-time
+    // Subscribe to Firestore Users in real-time with merge
     let unsubscribeFirestore: (() => void) | null = null;
     try {
       unsubscribeFirestore = listenUsersFromFirestore((firestoreUsers) => {
-        if (firestoreUsers && Array.isArray(firestoreUsers) && firestoreUsers.length > 0) {
-          setUsers(firestoreUsers);
-          localStorage.setItem('dsp_registered_users', JSON.stringify(firestoreUsers));
+        if (firestoreUsers && Array.isArray(firestoreUsers)) {
+          setUsers((prev) => {
+            const map = new Map<string, StoredUserAccount>();
+            prev.forEach((u) => {
+              const key = u.id || u.email?.toLowerCase() || u.phone;
+              map.set(key, u);
+            });
+            firestoreUsers.forEach((u) => {
+              const key = u.id || u.email?.toLowerCase() || u.phone;
+              map.set(key, { ...map.get(key), ...u });
+            });
+            const merged = Array.from(map.values()).filter(
+              (u) => u.id !== 'usr_demo_101' && u.email !== 'customer@dspdigitalmart.com'
+            );
+            try {
+              localStorage.setItem('dsp_registered_users', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
         }
       });
     } catch {}
@@ -76,7 +99,7 @@ export const AdminCustomers: React.FC = () => {
           setUsers(loaded);
         }
       });
-    }, 6000);
+    }, 5000);
 
     return () => {
       window.removeEventListener('dsp_users_changed', handleUpdate);
@@ -165,8 +188,19 @@ export const AdminCustomers: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
           <button
+            type="button"
+            onClick={() => reloadUsers(true)}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
+            title="ক্লাউড থেকে নতুন কাস্টমার ইউজার রিফ্রেশ করুন"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-[#0052FF] ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'সিঙ্ক হচ্ছে...' : 'রিফ্রেশ'}</span>
+          </button>
+
+          <button
             onClick={() => alert('Customer access settings are configured.')}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs cursor-pointer"
           >
             <Settings className="w-3.5 h-3.5 text-slate-500" />
             <span>SETTINGS</span>

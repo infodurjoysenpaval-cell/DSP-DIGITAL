@@ -4,6 +4,8 @@ import { SHOP_INFO, CATEGORIES, PRODUCTS } from '../data/storeData';
 import { Product, Category, UserProfile } from '../types';
 import { registerUser, loginUser } from '../utils/authStorage';
 import { saveAffiliateApplication } from '../utils/affiliateStorage';
+import { compressDocumentImage } from '../utils/imageCompress';
+import { syncUserToFirestore } from '../utils/firebase';
 
 interface HeaderProps {
   cartCount: number;
@@ -71,16 +73,22 @@ export const Header: React.FC<HeaderProps> = ({
   const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 8 * 1024 * 1024) {
-        setAffError('ফাইলের আকার সর্বোচ্চ ৮ মেগাবাইট (8MB) হতে পারবে।');
+      if (file.size > 10 * 1024 * 1024) {
+        setAffError('ফাইলের আকার সর্বোচ্চ ১০ মেগাবাইট (10MB) হতে পারবে।');
         return;
       }
       setAffDocName(file.name);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setAffDocUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      compressDocumentImage(file)
+        .then((res) => {
+          setAffDocUrl(res.dataUrl);
+        })
+        .catch(() => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            setAffDocUrl(reader.result as string);
+          };
+          reader.readAsDataURL(file);
+        });
     }
   };
 
@@ -138,7 +146,15 @@ export const Header: React.FC<HeaderProps> = ({
       }
 
       if (user) {
-        // 2. Save affiliate application
+        // 2. Mark user as pending affiliate and sync to Firestore
+        const updatedUser: UserProfile = {
+          ...user,
+          affiliateStatus: 'pending',
+          isAffiliate: false,
+        };
+        syncUserToFirestore(updatedUser).catch(() => {});
+
+        // 3. Save affiliate application (synced to Firestore & Server automatically)
         saveAffiliateApplication({
           userId: user.id,
           fullName: cleanName,
@@ -154,8 +170,8 @@ export const Header: React.FC<HeaderProps> = ({
           status: 'pending',
         });
 
-        // 3. Update state, notify user, close modal, and open user dashboard's affiliate tab
-        onUserChange?.(user);
+        // 4. Update state, notify user, close modal, and open user dashboard's affiliate tab
+        onUserChange?.(updatedUser);
         setAffSubmitting(false);
         setAffSuccess(true);
         setTimeout(() => {

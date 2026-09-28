@@ -33,9 +33,15 @@ export const syncUserToServer = async (user: any) => {
   try {
     if (typeof window !== 'undefined') {
       // 1. Sync to Firestore for real-time admin sync & cloud persistence
-      syncUserToFirestore(user).catch(() => {});
+      syncUserToFirestore(user)
+        .then((ok) => {
+          if (ok) console.log('[Firestore] User synced successfully:', user.id || user.email);
+        })
+        .catch((err) => {
+          console.warn('[Firestore] User sync notice:', err);
+        });
 
-      // 2. Sync to server
+      // 2. Sync to server API
       fetch('/api/users/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,26 +70,62 @@ export const syncUserToServer = async (user: any) => {
 export const fetchUsersFromServer = async (): Promise<StoredUserAccount[]> => {
   try {
     if (typeof window !== 'undefined') {
-      // 1. Fetch from Firestore first
-      const firestoreUsers = await fetchUsersFromFirestore();
-      if (firestoreUsers && Array.isArray(firestoreUsers) && firestoreUsers.length > 0) {
-        localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(firestoreUsers));
-        window.dispatchEvent(new CustomEvent('dsp_users_changed'));
-        return firestoreUsers;
+      const mergedMap = new Map<string, StoredUserAccount>();
+
+      // 1. Add current local users
+      getRegisteredUsers().forEach((u) => {
+        if (u && (u.id || u.email || u.phone)) {
+          const key = u.id || u.email?.toLowerCase() || u.phone;
+          mergedMap.set(key, u);
+        }
+      });
+
+      // 2. Fetch from Firestore (Authoritative cloud database)
+      try {
+        const firestoreUsers = await fetchUsersFromFirestore();
+        if (Array.isArray(firestoreUsers) && firestoreUsers.length > 0) {
+          firestoreUsers.forEach((u: StoredUserAccount) => {
+            if (u && (u.id || u.email || u.phone)) {
+              const key = u.id || u.email?.toLowerCase() || u.phone;
+              mergedMap.set(key, { ...mergedMap.get(key), ...u });
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Firestore users fetch notice:', err);
       }
 
-      // 2. Fallback to server
-      const res = await fetch('/api/users');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.users && Array.isArray(data.users) && data.users.length > 0) {
-          localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(data.users));
-          window.dispatchEvent(new CustomEvent('dsp_users_changed'));
-          return data.users;
+      // 3. Fetch from Server endpoint
+      try {
+        const res = await fetch('/api/users');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.users)) {
+            data.users.forEach((u: StoredUserAccount) => {
+              if (u && (u.id || u.email || u.phone)) {
+                const key = u.id || u.email?.toLowerCase() || u.phone;
+                mergedMap.set(key, { ...mergedMap.get(key), ...u });
+              }
+            });
+          }
         }
+      } catch (err) {
+        console.warn('Server users fetch notice:', err);
       }
+
+      const mergedList = Array.from(mergedMap.values()).filter(
+        (u) => u.id !== 'usr_demo_101' && u.email !== 'customer@dspdigitalmart.com'
+      );
+
+      try {
+        localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(mergedList));
+      } catch {}
+      window.dispatchEvent(new CustomEvent('dsp_users_changed'));
+      return mergedList;
     }
-  } catch {}
+  } catch (e) {
+    console.error('fetchUsersFromServer error:', e);
+  }
   return getRegisteredUsers();
 };
 

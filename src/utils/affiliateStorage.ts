@@ -89,26 +89,69 @@ const DEFAULT_APPLICATIONS: AffiliateApplication[] = [
 export async function syncAffiliatesFromServer(): Promise<AffiliateApplication[]> {
   try {
     if (typeof window !== 'undefined') {
-      // 1. Fetch from Firestore first for authoritative cloud persistence
-      const firestoreAffs = await fetchAffiliatesFromFirestore();
-      if (firestoreAffs && Array.isArray(firestoreAffs) && firestoreAffs.length > 0) {
-        localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(firestoreAffs));
-        window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
-        return firestoreAffs;
+      const mergedMap = new Map<string, AffiliateApplication>();
+
+      // 1. Initial base applications
+      DEFAULT_APPLICATIONS.forEach((a) => {
+        if (a && a.id) mergedMap.set(a.id, a);
+      });
+
+      // 2. Existing local storage applications
+      try {
+        const raw = localStorage.getItem(AFFILIATE_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((a: AffiliateApplication) => {
+              if (a && a.id) mergedMap.set(a.id, { ...mergedMap.get(a.id), ...a });
+            });
+          }
+        }
+      } catch {}
+
+      // 3. Fetch from Firestore (Authoritative cloud store)
+      try {
+        const firestoreAffs = await fetchAffiliatesFromFirestore();
+        if (Array.isArray(firestoreAffs) && firestoreAffs.length > 0) {
+          firestoreAffs.forEach((a: AffiliateApplication) => {
+            if (a && a.id) {
+              mergedMap.set(a.id, { ...mergedMap.get(a.id), ...a });
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Firestore affiliates fetch notice:', err);
       }
 
-      // 2. Fallback to server endpoint
-      const res = await fetch('/api/affiliates');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.affiliates && Array.isArray(data.affiliates) && data.affiliates.length > 0) {
-          localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(data.affiliates));
-          window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
-          return data.affiliates;
+      // 4. Fetch from Server API
+      try {
+        const res = await fetch('/api/affiliates');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.affiliates)) {
+            data.affiliates.forEach((a: AffiliateApplication) => {
+              if (a && a.id) {
+                mergedMap.set(a.id, { ...mergedMap.get(a.id), ...a });
+              }
+            });
+          }
         }
+      } catch (err) {
+        console.warn('Server affiliates fetch notice:', err);
+      }
+
+      const mergedList = Array.from(mergedMap.values());
+      if (mergedList.length > 0) {
+        try {
+          localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(mergedList));
+        } catch {}
+        window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
+        return mergedList;
       }
     }
-  } catch {}
+  } catch (e) {
+    console.error('syncAffiliatesFromServer error:', e);
+  }
   return getAffiliateApplications();
 }
 
@@ -177,29 +220,41 @@ export function saveAffiliateApplication(
     all.unshift(newApp);
   }
 
+  // 1. Safe local storage write
   try {
     localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(all));
-    window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
-
-    // Sync to Firestore for real-time admin sync & cloud persistence
-    syncAffiliateToFirestore(newApp).catch(() => {});
-
-    // Post to server so Admin gets the data on any device
-    if (typeof window !== 'undefined') {
-      fetch('/api/affiliates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newApp),
-      }).catch(() => {});
-
-      try {
-        const bc = new BroadcastChannel('dsp_affiliate_channel');
-        bc.postMessage({ type: 'AFFILIATE_SAVED', app: newApp });
-        bc.close();
-      } catch {}
-    }
   } catch (e) {
-    console.error('Failed to save affiliate app', e);
+    console.warn('LocalStorage save notice for affiliate:', e);
+  }
+
+  try {
+    window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
+  } catch {}
+
+  // 2. Authoritative Firestore Sync (CRITICAL: ALWAYS CALLED)
+  syncAffiliateToFirestore(newApp)
+    .then((success) => {
+      if (success) {
+        console.log('[Firestore] Affiliate application saved successfully:', newApp.id);
+      }
+    })
+    .catch((err) => {
+      console.warn('[Firestore] Affiliate sync notice:', err);
+    });
+
+  // 3. Post to backend server endpoint for cross-browser persistence
+  if (typeof window !== 'undefined') {
+    fetch('/api/affiliates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newApp),
+    }).catch(() => {});
+
+    try {
+      const bc = new BroadcastChannel('dsp_affiliate_channel');
+      bc.postMessage({ type: 'AFFILIATE_SAVED', app: newApp });
+      bc.close();
+    } catch {}
   }
 
   return newApp;

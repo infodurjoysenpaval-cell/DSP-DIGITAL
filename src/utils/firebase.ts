@@ -48,6 +48,67 @@ googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
+// Listen for Auth changes and Redirect Results
+if (typeof window !== 'undefined') {
+  try {
+    onAuthStateChanged(auth, (fbUser) => {
+      if (fbUser && fbUser.email) {
+        const current = getCurrentUser();
+        if (!current || current.email.toLowerCase() !== fbUser.email.toLowerCase()) {
+          const userProfile: UserProfile = {
+            id: `usr_g_${fbUser.uid}`,
+            name: fbUser.displayName || fbUser.email.split('@')[0] || 'Google User',
+            email: fbUser.email,
+            phone: fbUser.phoneNumber || '',
+            avatar:
+              fbUser.photoURL ||
+              'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+            walletBalance: 0,
+            referralCode:
+              (fbUser.displayName || 'DSP').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() +
+              Math.floor(1000 + Math.random() * 9000),
+            createdAt: new Date().toISOString(),
+            emailVerified: true,
+            authProvider: 'google',
+          };
+          const saved = saveGoogleUser(userProfile);
+          syncUserToFirestore(saved);
+        }
+      }
+    });
+
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user && result.user.email) {
+          const fbUser = result.user;
+          const userProfile: UserProfile = {
+            id: `usr_g_${fbUser.uid}`,
+            name: fbUser.displayName || fbUser.email.split('@')[0] || 'Google User',
+            email: fbUser.email,
+            phone: fbUser.phoneNumber || '',
+            avatar:
+              fbUser.photoURL ||
+              'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+            walletBalance: 0,
+            referralCode:
+              (fbUser.displayName || 'DSP').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() +
+              Math.floor(1000 + Math.random() * 9000),
+            createdAt: new Date().toISOString(),
+            emailVerified: true,
+            authProvider: 'google',
+          };
+          const saved = saveGoogleUser(userProfile);
+          syncUserToFirestore(saved);
+        }
+      })
+      .catch((err) => {
+        console.warn('Redirect result check notice:', err?.message || err);
+      });
+  } catch (err) {
+    console.warn('Auth listener registration notice:', err);
+  }
+}
+
 // Validate connection to Firestore at initialization
 async function testConnection() {
   try {
@@ -135,19 +196,23 @@ export async function syncUserToFirestore(user: any): Promise<boolean> {
   if (!user || !user.id) return false;
   const path = `users/${user.id}`;
   try {
-    const sanitizedUser = {
-      ...user,
+    const sanitizedUser: Record<string, any> = {
       id: String(user.id),
-      name: String(user.name || 'User'),
-      email: String(user.email || ''),
-      phone: String(user.phone || ''),
+      name: String(user.name || 'User').slice(0, 200),
+      email: String(user.email || '').trim().toLowerCase(),
+      phone: String(user.phone || '').trim(),
       role: user.role || 'customer',
       walletBalance: Number(user.walletBalance ?? 0),
       referralCode: String(user.referralCode || ''),
+      createdAt: user.createdAt || new Date().toISOString(),
       lastLoginAt: user.lastLoginAt || new Date().toISOString(),
       status: user.status || 'active',
       isAffiliate: Boolean(user.isAffiliate),
     };
+    if (user.avatar) sanitizedUser.avatar = String(user.avatar).slice(0, 1000);
+    if (user.affiliateStatus) sanitizedUser.affiliateStatus = user.affiliateStatus;
+    if (user.adminRole) sanitizedUser.adminRole = user.adminRole;
+
     await setDoc(doc(db, 'users', user.id), sanitizedUser, { merge: true });
     return true;
   } catch (err) {
@@ -204,11 +269,16 @@ export async function syncAffiliateToFirestore(affiliate: AffiliateApplication):
   if (!affiliate || !affiliate.id) return false;
   const path = `affiliates/${affiliate.id}`;
   try {
-    const sanitizedAff = {
-      ...affiliate,
+    const sanitizedAff: Record<string, any> = {
       id: String(affiliate.id),
-      fullName: String(affiliate.fullName || ''),
+      fullName: String(affiliate.fullName || 'Affiliate').slice(0, 200),
       contactNumber: String(affiliate.contactNumber || ''),
+      whatsappNumber: String(affiliate.whatsappNumber || affiliate.contactNumber || ''),
+      email: String(affiliate.email || '').trim().toLowerCase(),
+      channelLink: String(affiliate.channelLink || ''),
+      payoutMethod: String(affiliate.payoutMethod || 'bKash'),
+      accountNumber: String(affiliate.accountNumber || ''),
+      nidNumber: String(affiliate.nidNumber || ''),
       status: affiliate.status || 'pending',
       referralCode: String(affiliate.referralCode || ''),
       availableBalance: Number(affiliate.availableBalance ?? 0),
@@ -217,6 +287,19 @@ export async function syncAffiliateToFirestore(affiliate: AffiliateApplication):
       salesCount: Number(affiliate.salesCount ?? 0),
       submittedAt: affiliate.submittedAt || new Date().toISOString(),
     };
+    if (affiliate.userId) sanitizedAff.userId = String(affiliate.userId);
+    if (affiliate.documentName) sanitizedAff.documentName = String(affiliate.documentName);
+    if (affiliate.documentType) sanitizedAff.documentType = String(affiliate.documentType);
+    if (affiliate.documentSize) sanitizedAff.documentSize = String(affiliate.documentSize);
+    if (affiliate.notes) sanitizedAff.notes = String(affiliate.notes);
+
+    // Keep documentUrl under 850KB to respect Firestore's 1MB doc ceiling
+    if (affiliate.documentUrl) {
+      sanitizedAff.documentUrl = affiliate.documentUrl.length > 850000 
+        ? affiliate.documentUrl.slice(0, 850000) 
+        : affiliate.documentUrl;
+    }
+
     await setDoc(doc(db, 'affiliates', affiliate.id), sanitizedAff, { merge: true });
     return true;
   } catch (err) {
@@ -366,6 +449,7 @@ export async function performOfficialGoogleSignIn(): Promise<{
   user?: UserProfile;
   message?: string;
 }> {
+  let popupError: any = null;
   try {
     const result: UserCredential = await signInWithPopup(auth, googleProvider);
     const fbUser = result.user;
@@ -391,6 +475,7 @@ export async function performOfficialGoogleSignIn(): Promise<{
       return { success: true, user: saved };
     }
   } catch (fbError: any) {
+    popupError = fbError;
     console.warn('Firebase signInWithPopup fallback, trying Google Identity Services:', fbError?.message || fbError);
     if (fbError?.code === 'auth/popup-closed-by-user') {
       return { success: false, message: 'Google Sign-In popup was closed.' };
@@ -399,91 +484,98 @@ export async function performOfficialGoogleSignIn(): Promise<{
 
   // Fallback: Google Identity Services (GIS)
   if (typeof window !== 'undefined' && window.google?.accounts?.oauth2) {
-    const gisResult = await new Promise<{ success: boolean; user?: UserProfile; message?: string }>((resolve) => {
-      try {
-        const client = window.google.accounts.oauth2.initTokenClient({
-          client_id: GOOGLE_OAUTH_CLIENT_ID,
-          scope: 'openid profile email',
-          callback: async (resp: any) => {
-            if (resp.error) {
-              resolve({
-                success: false,
-                message: `Google Sign-In error: ${resp.error_description || resp.error}`,
-              });
-              return;
-            }
-
-            if (resp.access_token) {
-              try {
-                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                  headers: { Authorization: `Bearer ${resp.access_token}` },
+    try {
+      const gisResult = await new Promise<{ success: boolean; user?: UserProfile; message?: string }>((resolve) => {
+        try {
+          const client = window.google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_OAUTH_CLIENT_ID,
+            scope: 'openid profile email',
+            callback: async (resp: any) => {
+              if (resp.error) {
+                resolve({
+                  success: false,
+                  message: `Google Sign-In error: ${resp.error_description || resp.error}`,
                 });
-                const gData = await res.json();
-                if (gData && gData.email) {
-                  const userProfile: UserProfile = {
-                    id: `usr_g_${gData.sub || Date.now()}`,
-                    name: gData.name || gData.given_name || 'Google User',
-                    email: gData.email,
-                    phone: '',
-                    avatar:
-                      gData.picture ||
-                      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
-                    walletBalance: 0,
-                    referralCode:
-                      (gData.name || 'DSP').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() +
-                      Math.floor(1000 + Math.random() * 9000),
-                    createdAt: new Date().toISOString(),
-                    emailVerified: true,
-                    authProvider: 'google',
-                  };
-                  const saved = saveGoogleUser(userProfile);
-                  syncUserToFirestore(saved);
-                  resolve({ success: true, user: saved });
-                  return;
-                }
-              } catch (e: any) {
-                resolve({ success: false, message: e.message || 'Failed to fetch Google profile' });
                 return;
               }
-            }
-            resolve({ success: false, message: 'Google Sign-In did not complete.' });
-          },
-        });
-        client.requestAccessToken({ prompt: 'select_account' });
-        return;
-      } catch (err: any) {
-        resolve({ success: false, message: err.message || 'Google OAuth failed to initialize' });
-        return;
-      }
-    });
 
-    if (gisResult.success) {
-      return gisResult;
+              if (resp.access_token) {
+                try {
+                  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: { Authorization: `Bearer ${resp.access_token}` },
+                  });
+                  const gData = await res.json();
+                  if (gData && gData.email) {
+                    const userProfile: UserProfile = {
+                      id: `usr_g_${gData.sub || Date.now()}`,
+                      name: gData.name || gData.given_name || 'Google User',
+                      email: gData.email,
+                      phone: '',
+                      avatar:
+                        gData.picture ||
+                        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+                      walletBalance: 0,
+                      referralCode:
+                        (gData.name || 'DSP').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() +
+                        Math.floor(1000 + Math.random() * 9000),
+                      createdAt: new Date().toISOString(),
+                      emailVerified: true,
+                      authProvider: 'google',
+                    };
+                    const saved = saveGoogleUser(userProfile);
+                    syncUserToFirestore(saved);
+                    resolve({ success: true, user: saved });
+                    return;
+                  }
+                } catch (e: any) {
+                  resolve({ success: false, message: e.message || 'Failed to fetch Google profile' });
+                  return;
+                }
+              }
+              resolve({ success: false, message: 'Google Sign-In did not complete.' });
+            },
+          });
+          client.requestAccessToken({ prompt: 'select_account' });
+        } catch (err: any) {
+          resolve({ success: false, message: err?.message || 'Google OAuth failed to initialize' });
+        }
+      });
+
+      if (gisResult.success) {
+        return gisResult;
+      }
+    } catch (e) {
+      console.warn('GIS fallback notice:', e);
     }
   }
 
-  // Fallback prompt for iframe restriction
-  const userEmail = prompt('Iframe/Popup restricted. Please enter your Gmail address to verify & sign in with Google:');
-  if (!userEmail || !userEmail.includes('@')) {
-    return { success: false, message: 'Google Sign-In cancelled.' };
+  // Handle specific Firebase error codes
+  if (popupError?.code === 'auth/unauthorized-domain') {
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+    return {
+      success: false,
+      message: `Domain '${hostname}' is not authorized in Firebase Console yet. Please add it in Firebase Console > Authentication > Settings > Authorized domains.`,
+    };
   }
-  const cleanEmail = userEmail.trim().toLowerCase();
-  const userName = cleanEmail.split('@')[0];
-  const userProfile: UserProfile = {
-    id: `usr_g_${Date.now()}`,
-    name: userName.charAt(0).toUpperCase() + userName.slice(1),
-    email: cleanEmail,
-    phone: '',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
-    walletBalance: 0,
-    referralCode: 'DSP' + Math.floor(1000 + Math.random() * 9000),
-    createdAt: new Date().toISOString(),
-    emailVerified: true,
-    authProvider: 'google',
+
+  if (popupError?.code === 'auth/operation-not-allowed') {
+    return {
+      success: false,
+      message: 'Google Sign-In provider is disabled in Firebase Console. Please enable Google under Authentication > Sign-in method.',
+    };
+  }
+
+  if (popupError?.code === 'auth/popup-blocked') {
+    return {
+      success: false,
+      message: 'Google Sign-In popup was blocked by browser. Please allow popups for this site and try again.',
+    };
+  }
+
+  return {
+    success: false,
+    message: popupError?.message || 'Google Sign-In could not be completed. Please check authorized domain settings or register with email.',
   };
-  const saved = saveGoogleUser(userProfile);
-  syncUserToFirestore(saved);
-  return { success: true, user: saved };
 }
 
 /**
@@ -577,7 +669,13 @@ export async function checkIncomingEmailVerificationLink(): Promise<{
   if (isSignInWithEmailLink(auth, window.location.href)) {
     let email = window.localStorage.getItem('dsp_email_for_signin');
     if (!email) {
-      email = window.prompt('Please enter the email address you used to request the verification link:');
+      try {
+        email = typeof window !== 'undefined' && typeof window.prompt === 'function'
+          ? window.prompt('Please enter the email address you used to request the verification link:')
+          : null;
+      } catch {
+        email = null;
+      }
     }
 
     if (email) {
