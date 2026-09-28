@@ -71,6 +71,10 @@ export type AdminTab =
   | 'balance-sheet'
   | 'review'
   | 'income'
+  | 'income-all'
+  | 'income-add'
+  | 'income-categories'
+  | 'income-add-category'
   | 'activity-log'
   | 'ip-block'
   | 'gallery'
@@ -110,6 +114,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     customization: true,
     customer: true,
     'admin-control': true,
+    income: true,
   });
 
   const toggleMenu = (key: string) => {
@@ -597,30 +602,98 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           <span>Balance Sheet</span>
         </button>
 
-        {/* 19. Review */}
+        {/* 19. Review (Matching Screenshot: Purple Active Pill with Star in Circle) */}
         <button
           onClick={() => onTabChange('review')}
-          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-            isTabActive('review') ? 'bg-[#0052FF] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            isTabActive('review')
+              ? 'bg-[#6366F1] text-white shadow-md shadow-indigo-500/20'
+              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}
         >
-          <Star className="w-4 h-4" />
+          <div
+            className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+              isTabActive('review') ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'
+            }`}
+          >
+            <Star className="w-3 h-3 fill-current" />
+          </div>
           <span>Review</span>
         </button>
 
-        {/* 20. Income */}
-        <button
-          onClick={() => onTabChange('income')}
-          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-            isTabActive('income') ? 'bg-[#0052FF] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <DollarSign className="w-4 h-4" />
-            <span>Income</span>
-          </div>
-          <ChevronRight className="w-3.5 h-3.5 opacity-70" />
-        </button>
+        {/* 20. Income (Collapsible matching screenshot: All Income, Add Income, Income Categories, Add Category) */}
+        <div>
+          <button
+            onClick={() => {
+              toggleMenu('income');
+              onTabChange('income');
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              activeTab.startsWith('income')
+                ? 'bg-[#6366F1] text-white shadow-md shadow-indigo-500/20'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Grid className="w-4 h-4" />
+              <span>Income</span>
+            </div>
+            {openMenus['income'] ? (
+              <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 opacity-70" />
+            )}
+          </button>
+
+          {openMenus['income'] && (
+            <div className="pl-9 pr-2 py-1 space-y-1">
+              <button
+                onClick={() => onTabChange('income-all')}
+                className={`w-full text-left py-1.5 px-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'income' || activeTab === 'income-all'
+                    ? 'text-[#6366F1] font-bold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[#6366F1]"></span>
+                <span>All Income</span>
+              </button>
+              <button
+                onClick={() => onTabChange('income-add')}
+                className={`w-full text-left py-1.5 px-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'income-add'
+                    ? 'text-[#6366F1] font-bold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[#6366F1]"></span>
+                <span>Add Income</span>
+              </button>
+              <button
+                onClick={() => onTabChange('income-categories')}
+                className={`w-full text-left py-1.5 px-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'income-categories'
+                    ? 'text-[#6366F1] font-bold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[#6366F1]"></span>
+                <span>Income Categories</span>
+              </button>
+              <button
+                onClick={() => onTabChange('income-add-category')}
+                className={`w-full text-left py-1.5 px-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'income-add-category'
+                    ? 'text-[#6366F1] font-bold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[#6366F1]"></span>
+                <span>Add Category</span>
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* 21. Activity Log */}
         <button

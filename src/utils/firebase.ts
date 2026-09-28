@@ -28,14 +28,16 @@ import {
   collection,
   onSnapshot,
 } from 'firebase/firestore';
-import { UserProfile, Product, AffiliateApplication } from '../types';
+import { UserProfile, Product, AffiliateApplication, OrderDetails } from '../types';
 import { saveGoogleUser, setUserEmailVerified, getCurrentUser, loginUser, registerUser } from './authStorage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 export const FIREBASE_CONFIG = firebaseConfig;
 
 export const GOOGLE_OAUTH_CLIENT_ID =
-  import.meta.env.VITE_GOOGLE_CLIENT_ID || FIREBASE_CONFIG.oAuthClientId;
+  (typeof import.meta !== 'undefined' && import.meta.env
+    ? import.meta.env.VITE_GOOGLE_CLIENT_ID
+    : undefined) || FIREBASE_CONFIG.oAuthClientId;
 
 const app = getApps().length === 0 ? initializeApp(FIREBASE_CONFIG) : getApp();
 export const auth = getAuth(app);
@@ -311,7 +313,8 @@ export async function syncAffiliateToFirestore(affiliate: AffiliateApplication):
 export async function updateAffiliateStatusInFirestore(
   id: string,
   status: 'approved' | 'restricted' | 'rejected' | 'pending',
-  notes?: string
+  notes?: string,
+  extra?: { referralCode?: string; userId?: string; email?: string; fullName?: string; phone?: string }
 ): Promise<boolean> {
   const path = `affiliates/${id}`;
   try {
@@ -322,7 +325,27 @@ export async function updateAffiliateStatusInFirestore(
     if (notes !== undefined) {
       updates.notes = notes;
     }
-    await updateDoc(doc(db, 'affiliates', id), updates);
+    if (extra?.referralCode) {
+      updates.referralCode = extra.referralCode;
+    }
+    await setDoc(doc(db, 'affiliates', id), updates, { merge: true });
+
+    // Also update corresponding user in Firestore so User Dashboard & Admin immediately sync
+    if (extra?.userId) {
+      const userUpdates: Record<string, any> = {
+        id: extra.userId,
+        isAffiliate: status === 'approved',
+        affiliateStatus: status,
+      };
+      if (extra.referralCode) userUpdates.referralCode = extra.referralCode;
+      if (extra.fullName) userUpdates.name = extra.fullName;
+      if (extra.email) userUpdates.email = extra.email;
+      if (extra.phone) userUpdates.phone = extra.phone;
+      await setDoc(doc(db, 'users', extra.userId), userUpdates, { merge: true }).catch((e) => {
+        console.warn('Notice syncing affiliate status to user in Firestore:', e);
+      });
+    }
+
     return true;
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, path);
@@ -861,3 +884,82 @@ export async function registerWithFirebaseEmailPassword(
   }
   return res;
 }
+
+export async function syncOrderToFirestore(order: OrderDetails): Promise<boolean> {
+  const path = `orders/${order.orderId}`;
+  try {
+    const cleanItems = (order.items || []).map((item) => ({
+      product: {
+        _id: item.product._id,
+        name: item.product.name,
+        slug: item.product.slug,
+        salePrice: item.product.salePrice,
+      },
+      quantity: item.quantity,
+      selectedVariation: item.selectedVariation
+        ? {
+            name: item.selectedVariation.name,
+            salePrice: item.selectedVariation.salePrice,
+          }
+        : null,
+    }));
+
+    const orderDoc = {
+      orderId: order.orderId,
+      userId: order.userId || 'guest',
+      customerName: order.customerName,
+      email: order.email,
+      phone: order.phone,
+      notes: order.notes || '',
+      paymentMethod: order.paymentMethod,
+      transactionId: order.transactionId || '',
+      totalAmount: order.totalAmount,
+      status: order.status || 'delivered',
+      licenseKey: order.licenseKey || `DSP-KEY-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+      affiliateDiscount: order.affiliateDiscount || 0,
+      referralDiscount: order.referralDiscount || 0,
+      appliedReferralCode: order.appliedReferralCode || '',
+      items: cleanItems,
+      createdAt: order.createdAt || new Date().toISOString(),
+      emailSent: true,
+      emailSentAt: new Date().toISOString(),
+    };
+
+    await setDoc(doc(db, 'orders', order.orderId), orderDoc, { merge: true });
+
+    // Also queue into /mail for Firebase Email Extension
+    try {
+      const mailId = `mail_${order.orderId}_${Date.now()}`;
+      await setDoc(doc(db, 'mail', mailId), {
+        to: order.email,
+        message: {
+          subject: `Order Confirmed #${order.orderId} - Digital License Delivery | DSP DIGITAL MART`,
+          html: `<p>Hello <strong>${order.customerName}</strong>, your digital order #${order.orderId} has been confirmed. License Key: <code>${orderDoc.licenseKey}</code></p>`,
+        },
+        orderId: order.orderId,
+        createdAt: new Date().toISOString(),
+      });
+    } catch {}
+
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+    return false;
+  }
+}
+
+export async function fetchOrdersFromFirestore(): Promise<OrderDetails[]> {
+  const path = 'orders';
+  try {
+    const snap = await getDocs(collection(db, path));
+    const orders: OrderDetails[] = [];
+    snap.forEach((d) => {
+      orders.push(d.data() as OrderDetails);
+    });
+    return orders;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, path);
+    return [];
+  }
+}
+

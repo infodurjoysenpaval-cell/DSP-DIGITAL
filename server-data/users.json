@@ -1,1 +1,28 @@
-[]
+[
+  {
+    "id": "usr_1790607314558_4039",
+    "name": "Durjoy Sen Paval",
+    "email": "info.durjoysenpaval@gmail.com",
+    "phone": "01928470571",
+    "role": "customer",
+    "walletBalance": 0,
+    "referralCode": "DURJ96",
+    "isAffiliate": true,
+    "affiliateStatus": "approved",
+    "createdAt": "2026-09-28T14:55:14.566Z",
+    "lastLoginAt": "2026-09-28T15:04:30.201Z",
+    "status": "active"
+  },
+  {
+    "id": "usr_test_123",
+    "name": "Test User",
+    "email": "test@example.com",
+    "phone": "01711111111",
+    "createdAt": "2026-09-28T15:00:53.007Z",
+    "lastLoginAt": "2026-09-28T15:00:53.007Z",
+    "loginCount": 1,
+    "status": "active",
+    "role": "customer",
+    "walletBalance": 0
+  }
+]

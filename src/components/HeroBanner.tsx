@@ -37,7 +37,11 @@ export const HeroBanner: React.FC = () => {
                 src={banner.images[0]}
                 alt={banner.name || 'DSP Digital Mart Promo Banner'}
                 referrerPolicy="no-referrer"
-                className="w-full h-full object-cover object-center"
+                loading="eager"
+                className="w-full h-full object-cover object-center select-none"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.opacity = '0.9';
+                }}
               />
             </div>
           ))}

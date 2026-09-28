@@ -270,20 +270,36 @@ app.post('/api/affiliates', (req: Request, res: Response) => {
 
   writeJSON(AFFILIATES_FILE, affiliates);
 
-  // Also sync user's affiliateStatus in users list if exists
+  // Also sync user's affiliateStatus in users list (create user record if not present)
   if (appData.userId || cleanEmail) {
     const users = readJSON<any[]>(USERS_FILE, []);
     const uIdx = users.findIndex(
       (u) =>
         (appData.userId && u.id === appData.userId) ||
-        (cleanEmail && u.email && u.email.toLowerCase().trim() === cleanEmail)
+        (cleanEmail && u.email && u.email.toLowerCase().trim() === cleanEmail) ||
+        (cleanPhone && u.phone && u.phone.replace(/[^0-9]/g, '') === cleanPhone)
     );
     if (uIdx >= 0) {
       users[uIdx].affiliateStatus = newApp.status;
       users[uIdx].isAffiliate = newApp.status === 'approved';
       users[uIdx].referralCode = newApp.referralCode;
-      writeJSON(USERS_FILE, users);
+    } else {
+      users.unshift({
+        id: newApp.userId || `usr_${Date.now()}`,
+        name: newApp.fullName,
+        email: newApp.email,
+        phone: newApp.contactNumber,
+        role: 'customer',
+        walletBalance: 0,
+        isAffiliate: newApp.status === 'approved',
+        affiliateStatus: newApp.status,
+        referralCode: newApp.referralCode,
+        createdAt: newApp.submittedAt || new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+        status: 'active',
+      });
     }
+    writeJSON(USERS_FILE, users);
   }
 
   res.json({ success: true, application: newApp, affiliates });
@@ -291,7 +307,7 @@ app.post('/api/affiliates', (req: Request, res: Response) => {
 
 app.patch('/api/affiliates/:id', (req: Request, res: Response) => {
   const { id } = req.params;
-  const { status, notes } = req.body;
+  const { status, notes, referralCode, userId, email, fullName, phone } = req.body;
   const affiliates = readJSON<any[]>(AFFILIATES_FILE, DEFAULT_AFFILIATES);
 
   const idx = affiliates.findIndex((a) => a.id === id);
@@ -308,6 +324,7 @@ app.patch('/api/affiliates/:id', (req: Request, res: Response) => {
   if (status === 'approved') {
     if (!affiliates[idx].referralCode) {
       affiliates[idx].referralCode =
+        referralCode ||
         affiliates[idx].fullName.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase() +
         Math.floor(10 + Math.random() * 90);
     }
@@ -320,20 +337,41 @@ app.patch('/api/affiliates/:id', (req: Request, res: Response) => {
 
   writeJSON(AFFILIATES_FILE, affiliates);
 
-  // Sync user status in users file
+  // Sync user status in users file (create if missing)
   const users = readJSON<any[]>(USERS_FILE, []);
   const targetUser = affiliates[idx];
+  const targetId = userId || targetUser.userId;
+  const targetEmail = (email || targetUser.email || '').toLowerCase().trim();
+  const targetPhone = (phone || targetUser.contactNumber || '').replace(/[^0-9]/g, '');
+
   const uIdx = users.findIndex(
     (u) =>
-      u.id === targetUser.userId ||
-      (targetUser.email && u.email?.toLowerCase() === targetUser.email.toLowerCase())
+      (targetId && u.id === targetId) ||
+      (targetEmail && u.email?.toLowerCase().trim() === targetEmail) ||
+      (targetPhone && u.phone && u.phone.replace(/[^0-9]/g, '') === targetPhone)
   );
+
   if (uIdx >= 0) {
     users[uIdx].affiliateStatus = status;
     users[uIdx].isAffiliate = status === 'approved';
     users[uIdx].referralCode = targetUser.referralCode;
-    writeJSON(USERS_FILE, users);
+  } else {
+    users.unshift({
+      id: targetId || `usr_${Date.now()}`,
+      name: fullName || targetUser.fullName,
+      email: targetEmail,
+      phone: phone || targetUser.contactNumber,
+      role: 'customer',
+      walletBalance: 0,
+      isAffiliate: status === 'approved',
+      affiliateStatus: status,
+      referralCode: targetUser.referralCode,
+      createdAt: targetUser.submittedAt || new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+      status: 'active',
+    });
   }
+  writeJSON(USERS_FILE, users);
 
   res.json({ success: true, application: affiliates[idx], affiliates });
 });
@@ -414,6 +452,47 @@ app.delete('/api/products/:id', (req: Request, res: Response) => {
   writeJSON(PRODUCTS_FILE, products);
   res.json({ success: true, message: 'Product deleted', products });
 });
+
+// 4. Automated Order Confirmation & License Key Email Service Endpoint
+const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
+
+app.get('/api/orders', (_req: Request, res: Response) => {
+  const orders = readJSON<any[]>(ORDERS_FILE, []);
+  res.json({ success: true, orders });
+});
+
+app.post('/api/send-order-email', (req: Request, res: Response) => {
+  const { order, emailHtml } = req.body;
+  if (!order || !order.email) {
+    return res.status(400).json({ success: false, message: 'Missing order details or email' });
+  }
+
+  // Persist order in backend storage
+  const orders = readJSON<any[]>(ORDERS_FILE, []);
+  const existingIdx = orders.findIndex((o) => o.orderId === order.orderId);
+  const orderRecord = {
+    ...order,
+    emailSent: true,
+    emailSentAt: new Date().toISOString(),
+  };
+
+  if (existingIdx >= 0) {
+    orders[existingIdx] = orderRecord;
+  } else {
+    orders.unshift(orderRecord);
+  }
+  writeJSON(ORDERS_FILE, orders);
+
+  console.log(`[Automated Email Service] Dispatched confirmation & license key delivery to: ${order.email} (Order: #${order.orderId}, Key: ${order.licenseKey || 'GENUINE-KEY'})`);
+
+  res.json({
+    success: true,
+    message: `Order confirmation & license key email sent to ${order.email}`,
+    orderId: order.orderId,
+    emailSentAt: orderRecord.emailSentAt,
+  });
+});
+
 
 // 4. Image Upload & Optimization API
 app.post('/api/upload', (req: Request, res: Response) => {

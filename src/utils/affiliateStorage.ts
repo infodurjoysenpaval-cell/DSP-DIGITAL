@@ -157,6 +157,7 @@ export async function syncAffiliatesFromServer(): Promise<AffiliateApplication[]
 
 export function getAffiliateApplications(): AffiliateApplication[] {
   try {
+    if (typeof localStorage === 'undefined') return DEFAULT_APPLICATIONS;
     const raw = localStorage.getItem(AFFILIATE_STORAGE_KEY);
     if (!raw) {
       localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(DEFAULT_APPLICATIONS));
@@ -165,7 +166,6 @@ export function getAffiliateApplications(): AffiliateApplication[] {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_APPLICATIONS;
   } catch (e) {
-    console.error('Failed to get affiliate applications', e);
     return DEFAULT_APPLICATIONS;
   }
 }
@@ -291,21 +291,50 @@ export function updateAffiliateStatus(
       localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(all));
       window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
 
-      // Update in Firestore
-      updateAffiliateStatusInFirestore(id, status, notes).catch(() => {});
+      // Update in Firestore for authoritative real-time cloud persistence
+      updateAffiliateStatusInFirestore(id, status, notes, {
+        referralCode: all[index].referralCode,
+        userId: all[index].userId,
+        email: all[index].email,
+        fullName: all[index].fullName,
+        phone: all[index].contactNumber,
+      }).catch((e) => {
+        console.warn('Notice updating affiliate in Firestore:', e);
+      });
 
       // Sync status to server
       if (typeof window !== 'undefined') {
         fetch(`/api/affiliates/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status, notes }),
+          body: JSON.stringify({
+            status,
+            notes,
+            referralCode: all[index].referralCode,
+            userId: all[index].userId,
+            email: all[index].email,
+            fullName: all[index].fullName,
+            phone: all[index].contactNumber,
+          }),
         }).catch(() => {});
 
         try {
           const bc = new BroadcastChannel('dsp_affiliate_channel');
           bc.postMessage({ type: 'AFFILIATE_STATUS_UPDATED', id, status });
           bc.close();
+        } catch {}
+      }
+
+      // Also update local cached application for this user
+      if (all[index].userId) {
+        try {
+          const appRaw = localStorage.getItem(`dsp_affiliate_app_${all[index].userId}`);
+          if (appRaw) {
+            const parsedApp = JSON.parse(appRaw);
+            parsedApp.status = status;
+            if (all[index].referralCode) parsedApp.referralCode = all[index].referralCode;
+            localStorage.setItem(`dsp_affiliate_app_${all[index].userId}`, JSON.stringify(parsedApp));
+          }
         } catch {}
       }
 
@@ -316,7 +345,8 @@ export function updateAffiliateStatus(
         const uIdx = users.findIndex(
           (u: any) =>
             u.id === all[index].userId ||
-            (all[index].email && u.email?.toLowerCase() === all[index].email?.toLowerCase())
+            (all[index].email && u.email?.toLowerCase() === all[index].email?.toLowerCase()) ||
+            (all[index].contactNumber && u.phone && u.phone.replace(/[^0-9]/g, '') === all[index].contactNumber.replace(/[^0-9]/g, ''))
         );
         if (uIdx >= 0) {
           users[uIdx].affiliateStatus = status;
@@ -325,6 +355,7 @@ export function updateAffiliateStatus(
             users[uIdx].referralCode = all[index].referralCode;
           }
           localStorage.setItem('dsp_registered_users', JSON.stringify(users));
+          window.dispatchEvent(new CustomEvent('dsp_users_changed'));
         }
       }
 
@@ -334,7 +365,8 @@ export function updateAffiliateStatus(
         const cur = JSON.parse(currentRaw);
         if (
           cur.id === all[index].userId ||
-          (all[index].email && cur.email?.toLowerCase() === all[index].email?.toLowerCase())
+          (all[index].email && cur.email?.toLowerCase() === all[index].email?.toLowerCase()) ||
+          (all[index].contactNumber && cur.phone && cur.phone.replace(/[^0-9]/g, '') === all[index].contactNumber.replace(/[^0-9]/g, ''))
         ) {
           cur.affiliateStatus = status;
           cur.isAffiliate = status === 'approved';
@@ -343,6 +375,7 @@ export function updateAffiliateStatus(
           }
           localStorage.setItem('dsp_current_user', JSON.stringify(cur));
           window.dispatchEvent(new CustomEvent('dsp_user_updated', { detail: cur }));
+          window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
         }
       }
     } catch (e) {
@@ -413,12 +446,14 @@ export function deleteAffiliateApplication(id: string): void {
  */
 export function isApprovedAffiliate(user?: UserProfile | null): boolean {
   if (!user) return false;
-  if (user.affiliateStatus === 'approved') return true;
+  if (user.isAffiliate === true || user.affiliateStatus === 'approved') return true;
   const all = getAffiliateApplications();
+  const cleanPhone = user.phone ? user.phone.replace(/[^0-9]/g, '') : '';
   const match = all.find(
     (a) =>
       (a.userId && a.userId === user.id) ||
-      (a.email && a.email.toLowerCase() === user.email.toLowerCase())
+      (a.email && user.email && a.email.toLowerCase() === user.email.toLowerCase()) ||
+      (cleanPhone && a.contactNumber && a.contactNumber.replace(/[^0-9]/g, '') === cleanPhone)
   );
   return match?.status === 'approved';
 }
@@ -429,10 +464,12 @@ export function isApprovedAffiliate(user?: UserProfile | null): boolean {
 export function getAffiliateForUser(user?: UserProfile | null): AffiliateApplication | null {
   if (!user) return null;
   const all = getAffiliateApplications();
+  const cleanPhone = user.phone ? user.phone.replace(/[^0-9]/g, '') : '';
   const match = all.find(
     (a) =>
       (a.userId && a.userId === user.id) ||
-      (a.email && a.email.toLowerCase() === user.email.toLowerCase())
+      (a.email && user.email && a.email.toLowerCase() === user.email.toLowerCase()) ||
+      (cleanPhone && a.contactNumber && a.contactNumber.replace(/[^0-9]/g, '') === cleanPhone)
   );
   return match || null;
 }

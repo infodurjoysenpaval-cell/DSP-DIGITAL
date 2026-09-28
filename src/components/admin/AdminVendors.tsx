@@ -18,6 +18,7 @@ import {
   VendorAdmin,
   VendorRole,
 } from '../../utils/adminStore';
+import { deleteUserFromFirestore } from '../../utils/firebase';
 
 export const AdminVendors: React.FC = () => {
   const [admins, setAdmins] = useState<VendorAdmin[]>(() => getVendorAdmins());
@@ -88,14 +89,19 @@ export const AdminVendors: React.FC = () => {
   };
 
   const handleDeleteAdmin = (id: string, name: string) => {
-    if (admins.length <= 1) {
+    const target = admins.find((a) => a.id === id);
+    if (target?.role === 'Owner' && admins.filter((a) => a.role === 'Owner').length <= 1) {
       alert('Cannot delete the primary owner account.');
       return;
     }
-    if (window.confirm(`Delete admin access for "${name}"?`)) {
+    if (window.confirm(`Are you sure you want to permanently remove "${name}" from administrators/vendors?`)) {
       const remaining = admins.filter((a) => a.id !== id);
       setAdmins(remaining);
       saveVendorAdmins(remaining);
+      fetch(`/api/users/${id}`, { method: 'DELETE' }).catch(() => {});
+      deleteUserFromFirestore(id).catch(() => {});
+      setMsg(`Admin "${name}" was successfully removed.`);
+      setTimeout(() => setMsg(''), 3000);
     }
   };
 

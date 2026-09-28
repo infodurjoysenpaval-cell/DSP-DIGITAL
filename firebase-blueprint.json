@@ -72,6 +72,37 @@
         "updatedAt": { "type": "string", "description": "Last update timestamp" }
       },
       "required": ["_id", "name", "salePrice"]
+    },
+    "order": {
+      "title": "Order",
+      "description": "Customer digital purchase order and license key details",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "description": "Unique order tracking code (e.g. DSP-123456)" },
+        "userId": { "type": "string", "description": "Optional customer user account ID" },
+        "customerName": { "type": "string", "description": "Full customer name" },
+        "email": { "type": "string", "format": "email", "description": "Customer destination email address" },
+        "phone": { "type": "string", "description": "Customer contact phone or WhatsApp" },
+        "totalAmount": { "type": "number", "description": "Total order amount in BDT" },
+        "paymentMethod": { "type": "string", "description": "Selected payment gateway" },
+        "transactionId": { "type": "string", "description": "Payment transaction ID or wallet reference" },
+        "status": { "type": "string", "description": "Order processing and fulfillment status" },
+        "licenseKey": { "type": "string", "description": "Generated genuine digital license key or activation code" },
+        "emailSent": { "type": "boolean", "description": "Whether automated confirmation email has been dispatched" },
+        "emailSentAt": { "type": "string", "description": "Timestamp of email dispatch" },
+        "createdAt": { "type": "string", "description": "Order creation ISO timestamp" }
+      },
+      "required": ["orderId", "customerName", "email", "phone", "totalAmount"]
+    },
+    "mail": {
+      "title": "Mail",
+      "description": "Firebase Trigger Email document queue",
+      "type": "object",
+      "properties": {
+        "to": { "type": "string", "format": "email", "description": "Recipient email address" },
+        "message": { "type": "object", "description": "Email payload with subject, html, and text" }
+      },
+      "required": ["to", "message"]
     }
   },
   "firestore": {
@@ -86,6 +117,14 @@
     "/products/{productId}": {
       "schema": "product",
       "description": "Store products and catalog items"
+    },
+    "/orders/{orderId}": {
+      "schema": "order",
+      "description": "Customer orders and license keys"
+    },
+    "/mail/{mailId}": {
+      "schema": "mail",
+      "description": "Automated email queue for Firebase Email Extension"
     }
   }
 }

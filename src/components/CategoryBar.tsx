@@ -44,12 +44,17 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({
                   : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:text-blue-600'
               }`}
             >
-              <img
-                src={cat.images[0]}
-                alt={cat.name}
-                referrerPolicy="no-referrer"
-                className="w-4 h-4 object-contain shrink-0"
-              />
+              {cat.images && cat.images[0] ? (
+                <img
+                  src={cat.images[0]}
+                  alt={cat.name}
+                  referrerPolicy="no-referrer"
+                  className="w-4 h-4 object-contain shrink-0"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              ) : null}
               <span className="whitespace-nowrap font-nav-text">{cat.name}</span>
             </button>
           );

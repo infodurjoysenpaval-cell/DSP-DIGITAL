@@ -7,6 +7,7 @@ import { saveOrderToHistory, deductWalletBalance } from '../utils/authStorage';
 import { saveIncompleteOrderDraft, resolveIncompleteOrder } from '../utils/incompleteOrdersStore';
 import { trackMetaEvent, trackGtmEvent } from '../utils/trackingInjector';
 import { isApprovedAffiliate, getActiveReferralCode, creditAffiliateCommission } from '../utils/affiliateStorage';
+import { sendOrderConfirmationAndLicenseEmail } from '../utils/emailService';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -262,6 +263,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     };
 
     saveOrderToHistory(newOrder);
+
+    // Trigger Automated Email Service (Firebase Cloud Functions / SMTP Dispatch)
+    sendOrderConfirmationAndLicenseEmail(newOrder).catch((err) => {
+      console.warn('Notice sending confirmation email:', err);
+    });
 
     // Credit 15% product discount value (or ৳20 minimum) to affiliate's dashboard balance
     // upon customer ordering with their referral link

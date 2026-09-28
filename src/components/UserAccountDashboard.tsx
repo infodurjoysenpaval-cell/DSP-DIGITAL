@@ -33,6 +33,7 @@ import {
   TrendingUp,
   Check,
   Search,
+  RefreshCw,
 } from 'lucide-react';
 import { UserProfile, OrderDetails } from '../types';
 import {
@@ -45,6 +46,7 @@ import {
   getWalletTransactions,
   WalletTransaction,
   setUserEmailVerified,
+  syncCurrentUserFromCloud,
 } from '../utils/authStorage';
 import {
   saveAffiliateApplication,
@@ -52,17 +54,19 @@ import {
   isApprovedAffiliate,
   requestAffiliatePayout,
   updateAffiliateStatus,
+  syncAffiliatesFromServer,
 } from '../utils/affiliateStorage';
 import { compressDocumentImage } from '../utils/imageCompress';
-import { syncUserToFirestore } from '../utils/firebase';
-import { AffiliateApplication } from '../types';
-import { SHOP_INFO } from '../data/storeData';
-import { getLiveProducts } from '../utils/adminStore';
 import {
+  syncUserToFirestore,
+  listenAffiliatesFromFirestore,
   performOfficialGoogleSignIn,
   sendEmailSignInVerificationLink,
   checkCurrentEmailVerificationStatus,
 } from '../utils/firebase';
+import { AffiliateApplication } from '../types';
+import { SHOP_INFO } from '../data/storeData';
+import { getLiveProducts } from '../utils/adminStore';
 
 interface UserAccountDashboardProps {
   currentUser: UserProfile;
@@ -146,14 +150,47 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
   const [isRequestingPayout, setIsRequestingPayout] = useState(false);
   const [payoutMsg, setPayoutMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [affiliateLinkCopied, setAffiliateLinkCopied] = useState(false);
+  const [isSyncingAffiliate, setIsSyncingAffiliate] = useState(false);
 
+  // Sync with cloud on mount & real-time updates
   React.useEffect(() => {
+    // 1. Initial background sync
+    syncCurrentUserFromCloud(currentUser).catch(() => {});
+    syncAffiliatesFromServer().catch(() => {});
+
+    // 2. Local event listeners
     const handleAffUpdate = () => {
       setAffiliateData(getAffiliateForUser(currentUser));
     };
     window.addEventListener('dsp_affiliate_updated', handleAffUpdate);
-    return () => window.removeEventListener('dsp_affiliate_updated', handleAffUpdate);
+    window.addEventListener('dsp_user_updated', handleAffUpdate);
+    window.addEventListener('dsp_users_changed', handleAffUpdate);
+
+    // 3. Firestore live listener
+    const unsubscribe = listenAffiliatesFromFirestore((affs) => {
+      if (Array.isArray(affs) && affs.length > 0) {
+        setAffiliateData(getAffiliateForUser(currentUser));
+      }
+    });
+
+    return () => {
+      window.removeEventListener('dsp_affiliate_updated', handleAffUpdate);
+      window.removeEventListener('dsp_user_updated', handleAffUpdate);
+      window.removeEventListener('dsp_users_changed', handleAffUpdate);
+      unsubscribe();
+    };
   }, [currentUser]);
+
+  const handleManualSyncAffiliate = async () => {
+    setIsSyncingAffiliate(true);
+    try {
+      await syncCurrentUserFromCloud(currentUser);
+      await syncAffiliatesFromServer();
+      setAffiliateData(getAffiliateForUser(currentUser));
+    } finally {
+      setTimeout(() => setIsSyncingAffiliate(false), 500);
+    }
+  };
 
   const activeReferralCode =
     affiliateData?.referralCode ||
@@ -1213,28 +1250,39 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                     </h1>
                   </div>
 
-                  {/* Status Badge */}
-                  {affiliateData && (
-                    <span
-                      className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${
-                        affiliateData.status === 'approved'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : affiliateData.status === 'restricted'
-                          ? 'bg-amber-100 text-amber-800'
-                          : affiliateData.status === 'rejected'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}
+                  {/* Status Badge & Live Sync */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleManualSyncAffiliate}
+                      disabled={isSyncingAffiliate}
+                      title="Sync status with cloud"
+                      className="p-1.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition-all cursor-pointer text-xs flex items-center gap-1"
                     >
-                      {affiliateData.status === 'approved'
-                        ? 'Approved Affiliate'
-                        : affiliateData.status === 'restricted'
-                        ? 'Account Restricted'
-                        : affiliateData.status === 'rejected'
-                        ? 'Application Rejected'
-                        : 'Under Review'}
-                    </span>
-                  )}
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingAffiliate ? 'animate-spin text-blue-600' : ''}`} />
+                      <span className="hidden sm:inline text-[11px] font-medium">Sync Status</span>
+                    </button>
+                    {affiliateData && (
+                      <span
+                        className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${
+                          affiliateData.status === 'approved'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300/60'
+                            : affiliateData.status === 'restricted'
+                            ? 'bg-amber-100 text-amber-800 border border-amber-300/60'
+                            : affiliateData.status === 'rejected'
+                            ? 'bg-rose-100 text-rose-800 border border-rose-300/60'
+                            : 'bg-blue-100 text-blue-800 border border-blue-300/60'
+                        }`}
+                      >
+                        {affiliateData.status === 'approved'
+                          ? 'Approved Affiliate'
+                          : affiliateData.status === 'restricted'
+                          ? 'Account Restricted'
+                          : affiliateData.status === 'rejected'
+                          ? 'Application Rejected'
+                          : 'Under Review'}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* SCENARIO 1: RESTRICTED AFFILIATE */}

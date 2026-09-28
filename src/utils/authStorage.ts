@@ -1,5 +1,12 @@
 import { UserProfile, OrderDetails } from '../types';
-import { syncUserToFirestore, fetchUsersFromFirestore, deleteUserFromFirestore } from './firebase';
+import {
+  syncUserToFirestore,
+  fetchUsersFromFirestore,
+  deleteUserFromFirestore,
+  fetchAffiliatesFromFirestore,
+  db,
+} from './firebase';
+import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
 
 const CURRENT_USER_KEY = 'dsp_current_user';
 const REGISTERED_USERS_KEY = 'dsp_registered_users';
@@ -51,7 +58,21 @@ export const syncUserToServer = async (user: any) => {
           if (res.ok) {
             const data = await res.json();
             if (data.users && Array.isArray(data.users)) {
-              localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(data.users));
+              const currentList = getRegisteredUsers();
+              const map = new Map<string, StoredUserAccount>();
+              currentList.forEach((u) => {
+                if (u && (u.id || u.email)) map.set(u.id || u.email.toLowerCase(), u);
+              });
+              data.users.forEach((u: StoredUserAccount) => {
+                if (u && (u.id || u.email)) {
+                  const key = u.id || u.email?.toLowerCase();
+                  map.set(key, { ...map.get(key), ...u });
+                }
+              });
+              const merged = Array.from(map.values());
+              try {
+                localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(merged));
+              } catch {}
               window.dispatchEvent(new CustomEvent('dsp_users_changed'));
             }
           }
@@ -113,6 +134,45 @@ export const fetchUsersFromServer = async (): Promise<StoredUserAccount[]> => {
         console.warn('Server users fetch notice:', err);
       }
 
+      // 4. Also fetch from Firestore Affiliates (every affiliate applicant is an active customer user)
+      try {
+        const firestoreAffs = await fetchAffiliatesFromFirestore();
+        if (Array.isArray(firestoreAffs)) {
+          firestoreAffs.forEach((a: any) => {
+            if (a && (a.userId || a.email || a.contactNumber)) {
+              const key = a.userId || a.email?.toLowerCase() || a.contactNumber;
+              const existing = mergedMap.get(key);
+              if (!existing) {
+                mergedMap.set(key, {
+                  id: a.userId || a.id || `usr_aff_${Date.now()}`,
+                  name: a.fullName || 'Affiliate User',
+                  email: a.email || '',
+                  phone: a.contactNumber || a.whatsappNumber || '',
+                  passwordHash: '',
+                  role: 'customer',
+                  walletBalance: a.availableBalance || 0,
+                  isAffiliate: a.status === 'approved',
+                  affiliateStatus: a.status,
+                  referralCode: a.referralCode,
+                  createdAt: a.submittedAt || new Date().toISOString(),
+                  lastLoginAt: a.submittedAt || new Date().toISOString(),
+                  status: 'active',
+                });
+              } else {
+                mergedMap.set(key, {
+                  ...existing,
+                  isAffiliate: a.status === 'approved',
+                  affiliateStatus: a.status,
+                  referralCode: a.referralCode || existing.referralCode,
+                });
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Firestore affs in fetchUsers notice:', err);
+      }
+
       const mergedList = Array.from(mergedMap.values()).filter(
         (u) => u.id !== 'usr_demo_101' && u.email !== 'customer@dspdigitalmart.com'
       );
@@ -127,6 +187,79 @@ export const fetchUsersFromServer = async (): Promise<StoredUserAccount[]> => {
     console.error('fetchUsersFromServer error:', e);
   }
   return getRegisteredUsers();
+};
+
+export const syncCurrentUserFromCloud = async (
+  currentUser: UserProfile
+): Promise<UserProfile> => {
+  if (!currentUser) return currentUser;
+  try {
+    let updated = { ...currentUser };
+    let changed = false;
+
+    // 1. Check from Firestore Affiliates
+    try {
+      const snap = await getDocs(collection(db, 'affiliates'));
+      snap.forEach((d) => {
+        const aff = d.data();
+        if (
+          (aff.id && aff.id === currentUser.id) ||
+          (aff.userId && aff.userId === currentUser.id) ||
+          (aff.email && currentUser.email && aff.email.toLowerCase() === currentUser.email.toLowerCase()) ||
+          (aff.contactNumber && currentUser.phone && aff.contactNumber.replace(/[^0-9]/g, '') === currentUser.phone.replace(/[^0-9]/g, ''))
+        ) {
+          if (aff.status === 'approved') {
+            updated.isAffiliate = true;
+            updated.affiliateStatus = 'approved';
+            if (aff.referralCode) updated.referralCode = aff.referralCode;
+            changed = true;
+          } else if (aff.status) {
+            updated.affiliateStatus = aff.status;
+            if (aff.status !== 'approved') updated.isAffiliate = false;
+            changed = true;
+          }
+        }
+      });
+    } catch {}
+
+    // 2. Check from Firestore Users
+    if (currentUser.id) {
+      try {
+        const uSnap = await getDoc(doc(db, 'users', currentUser.id));
+        if (uSnap.exists()) {
+          const uData = uSnap.data();
+          if (uData.isAffiliate !== undefined && uData.isAffiliate !== updated.isAffiliate) {
+            updated.isAffiliate = Boolean(uData.isAffiliate);
+            changed = true;
+          }
+          if (uData.affiliateStatus && uData.affiliateStatus !== updated.affiliateStatus) {
+            updated.affiliateStatus = uData.affiliateStatus;
+            changed = true;
+          }
+          if (uData.referralCode && !updated.referralCode) {
+            updated.referralCode = uData.referralCode;
+            changed = true;
+          }
+          if (uData.walletBalance !== undefined && uData.walletBalance !== updated.walletBalance) {
+            updated.walletBalance = uData.walletBalance;
+            changed = true;
+          }
+        }
+      } catch {}
+    }
+
+    if (changed) {
+      try {
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updated));
+      } catch {}
+      window.dispatchEvent(new CustomEvent('dsp_user_updated', { detail: updated }));
+      window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
+      return updated;
+    }
+  } catch (err) {
+    console.warn('syncCurrentUserFromCloud notice:', err);
+  }
+  return currentUser;
 };
 
 export const getRegisteredUsers = (): StoredUserAccount[] => {
@@ -278,6 +411,36 @@ export const loginUser = (
   found.loginCount = (found.loginCount || 0) + 1;
   found.status = 'active';
 
+  // Check if this user has an approved affiliate record
+  let isAff = Boolean(found.isAffiliate || found.affiliateStatus === 'approved');
+  let affStatus = found.affiliateStatus;
+  let refCode = found.referralCode;
+
+  try {
+    const rawAffs = localStorage.getItem('dsp_affiliate_applications');
+    if (rawAffs) {
+      const affs: any[] = JSON.parse(rawAffs);
+      const match = affs.find(
+        (a) =>
+          a.id === found.id ||
+          a.userId === found.id ||
+          (found.email && a.email && a.email.toLowerCase() === found.email.toLowerCase()) ||
+          (found.phone && a.contactNumber && a.contactNumber.replace(/[^0-9]/g, '') === found.phone.replace(/[^0-9]/g, ''))
+      );
+      if (match) {
+        affStatus = match.status;
+        if (match.status === 'approved') {
+          isAff = true;
+          if (match.referralCode) refCode = match.referralCode;
+        }
+      }
+    }
+  } catch {}
+
+  found.isAffiliate = isAff;
+  found.affiliateStatus = affStatus;
+  if (refCode) found.referralCode = refCode;
+
   try {
     localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
   } catch (e) {}
@@ -289,7 +452,11 @@ export const loginUser = (
     phone: found.phone,
     avatar: found.avatar,
     walletBalance: found.walletBalance ?? 0,
-    referralCode: found.referralCode || generateReferralCode(found.name),
+    role: found.role || 'customer',
+    adminRole: found.adminRole,
+    isAffiliate: isAff,
+    affiliateStatus: affStatus,
+    referralCode: refCode || generateReferralCode(found.name),
     referredBy: found.referredBy,
     createdAt: found.createdAt,
     lastLoginAt: found.lastLoginAt,
@@ -305,6 +472,7 @@ export const loginUser = (
   syncUserToServer(found);
   window.dispatchEvent(new CustomEvent('dsp_users_changed'));
   window.dispatchEvent(new CustomEvent('dsp_user_updated', { detail: profile }));
+  window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
 
   return { success: true, message: 'Logged in successfully!', user: profile };
 };
@@ -416,8 +584,11 @@ export const registerUser = (
     return { success: false, message: 'Please enter your full name (at least 3 characters).' };
   }
 
-  // Bangladesh Mobile Number check (11 digits e.g. 01XXXXXXXXX)
-  const phoneDigits = cleanPhone.replace(/[^0-9]/g, '');
+  // Bangladesh Mobile Number check (11 digits e.g. 01XXXXXXXXX, handles +8801... or 8801...)
+  let phoneDigits = cleanPhone.replace(/[^0-9]/g, '');
+  if (phoneDigits.startsWith('8801') && phoneDigits.length === 13) {
+    phoneDigits = phoneDigits.slice(2);
+  }
   if (phoneDigits.length !== 11 || !phoneDigits.startsWith('01')) {
     return { success: false, message: 'Please enter a valid 11-digit mobile number (e.g., 017XXXXXXXX).' };
   }
@@ -437,13 +608,13 @@ export const registerUser = (
 
   // Check if phone or email already registered
   const existingPhone = users.find(
-    (u) => u.phone.replace(/[^0-9]/g, '') === phoneDigits
+    (u) => u.phone && u.phone.replace(/[^0-9]/g, '') === phoneDigits
   );
   if (existingPhone) {
     return { success: false, message: 'An account with this mobile number already exists. Please log in.' };
   }
 
-  const existingEmail = users.find((u) => u.email.toLowerCase() === cleanEmail);
+  const existingEmail = users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
   if (existingEmail) {
     return { success: false, message: 'An account with this email address already exists. Please log in.' };
   }
@@ -458,9 +629,12 @@ export const registerUser = (
     passwordHash: cleanPass,
     avatar: avatar?.trim() || undefined,
     walletBalance: 0,
+    role: 'customer',
+    isAffiliate: false,
     referralCode,
     referredBy: referredByCode?.trim() || undefined,
     createdAt: new Date().toISOString(),
+    status: 'active',
   };
 
   const updatedUsers = [...users, newUser];
@@ -475,9 +649,12 @@ export const registerUser = (
     phone: newUser.phone,
     avatar: newUser.avatar,
     walletBalance: newUser.walletBalance,
+    role: 'customer',
+    isAffiliate: false,
     referralCode: newUser.referralCode,
     referredBy: newUser.referredBy,
     createdAt: newUser.createdAt,
+    status: 'active',
   };
 
   try {

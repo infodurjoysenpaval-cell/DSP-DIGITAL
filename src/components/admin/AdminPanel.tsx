@@ -12,6 +12,13 @@ import { AdminOrders } from './AdminOrders';
 import { AdminIncompleteOrders } from './AdminIncompleteOrders';
 import { AdminAffiliates } from './AdminAffiliates';
 import { AdminAdditionalPages } from './AdminAdditionalPages';
+import { AdminReviews } from './AdminReviews';
+import { AdminIncome } from './AdminIncome';
+import { AdminStockAdjustment } from './AdminStockAdjustment';
+import { AdminDamage } from './AdminDamage';
+import { AdminBalanceSheet } from './AdminBalanceSheet';
+import { AdminActivityLog } from './AdminActivityLog';
+import { AdminIpBlock } from './AdminIpBlock';
 import { Sparkles, ArrowRight, Shield } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -58,6 +65,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return 'Order Management';
       case 'incomplete-orders':
         return 'Incomplete Orders & Abandoned Carts';
+      case 'review':
+        return 'Review';
+      case 'income':
+      case 'income-all':
+        return 'All Income';
+      case 'income-add':
+        return 'Add Income';
+      case 'income-categories':
+        return 'Income Categories';
+      case 'income-add-category':
+        return 'Add Income Category';
+      case 'stock-adjustment':
+        return 'Stock Adjustment';
+      case 'damage':
+        return 'Damage & Losses';
+      case 'balance-sheet':
+        return 'Balance Sheet';
+      case 'activity-log':
+        return 'Activity Log';
+      case 'ip-block':
+        return 'IP Block & Security';
       case 'additional-pages':
         return 'Website Pages & Policies Editor';
       default:
@@ -129,6 +157,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               {activeTab === 'orders' && <AdminOrders />}
 
               {activeTab === 'incomplete-orders' && <AdminIncompleteOrders />}
+
+              {activeTab === 'review' && <AdminReviews />}
+
+              {(activeTab === 'income' || activeTab === 'income-all') && (
+                <AdminIncome initialSubTab="all" />
+              )}
+              {activeTab === 'income-add' && <AdminIncome initialSubTab="add" />}
+              {activeTab === 'income-categories' && (
+                <AdminIncome initialSubTab="categories" />
+              )}
+              {activeTab === 'income-add-category' && (
+                <AdminIncome initialSubTab="add-category" />
+              )}
+
+              {activeTab === 'stock-adjustment' && <AdminStockAdjustment />}
+
+              {activeTab === 'damage' && <AdminDamage />}
+
+              {activeTab === 'balance-sheet' && <AdminBalanceSheet />}
+
+              {activeTab === 'activity-log' && <AdminActivityLog />}
+
+              {activeTab === 'ip-block' && <AdminIpBlock />}
             </>
           )}
 
@@ -149,7 +200,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             activeTab !== 'admin-control' &&
             activeTab !== 'orders' &&
             activeTab !== 'incomplete-orders' &&
-            activeTab !== 'additional-pages' && (
+            activeTab !== 'additional-pages' &&
+            activeTab !== 'review' &&
+            !activeTab.startsWith('income') &&
+            activeTab !== 'stock-adjustment' &&
+            activeTab !== 'damage' &&
+            activeTab !== 'balance-sheet' &&
+            activeTab !== 'activity-log' &&
+            activeTab !== 'ip-block' && (
               <div className="p-8 max-w-4xl mx-auto text-center space-y-4 pt-16">
                 <div className="w-16 h-16 rounded-3xl bg-blue-50 text-[#0052FF] flex items-center justify-center mx-auto shadow-xs border border-blue-100">
                   <Shield className="w-8 h-8" />
