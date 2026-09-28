@@ -10,111 +10,34 @@ import {
 const AFFILIATE_STORAGE_KEY = 'dsp_affiliate_applications';
 const ACTIVE_REFERRAL_CODE_KEY = 'dsp_active_referral_code';
 
-const DEFAULT_APPLICATIONS: AffiliateApplication[] = [
-  {
-    id: 'AFF-2026-001',
-    userId: 'usr-aff-101',
-    fullName: 'Ariful Islam',
-    contactNumber: '01719876543',
-    whatsappNumber: '01719876543',
-    email: 'ariful.digital@gmail.com',
-    channelLink: 'https://facebook.com/arifulsoftwarehub',
-    payoutMethod: 'bKash',
-    accountNumber: '01719876543',
-    nidNumber: '19954718293847',
-    documentUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80',
-    documentName: 'NID_Card_Front_Ariful.jpg',
-    documentType: 'image/jpeg',
-    documentSize: '1.4 MB',
-    status: 'pending',
-    submittedAt: new Date(Date.now() - 3600000 * 14).toISOString(),
-    notes: 'Facebook page has 18k tech followers. Strong prospective partner.',
-    referralCode: 'ARIFUL26',
-    availableBalance: 0,
-    totalEarned: 0,
-    paidOut: 0,
-    salesCount: 0,
-  },
-  {
-    id: 'AFF-2026-002',
-    userId: 'usr-aff-102',
-    fullName: 'Farhana Sultana',
-    contactNumber: '01912345678',
-    whatsappNumber: '01912345678',
-    email: 'farhana.techbd@gmail.com',
-    channelLink: 'https://youtube.com/@FarhanaTechReviews',
-    payoutMethod: 'bKash',
-    accountNumber: '01912345678',
-    nidNumber: '28471928374619',
-    documentUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80',
-    documentName: 'Trade_License_FarhanaTech.jpg',
-    documentType: 'image/jpeg',
-    documentSize: '2.1 MB',
-    status: 'approved',
-    submittedAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-    reviewedAt: new Date(Date.now() - 3600000 * 20).toISOString(),
-    notes: 'Verified YouTube reviewer. 15% discount and 20 Tk commission activated.',
-    referralCode: 'SRZKJC',
-    availableBalance: 10,
-    totalEarned: 10,
-    paidOut: 0,
-    salesCount: 1,
-  },
-  {
-    id: 'AFF-2026-003',
-    userId: 'usr-aff-103',
-    fullName: 'Tanvir Hossain',
-    contactNumber: '01833445566',
-    whatsappNumber: '01833445566',
-    email: 'tanvir.freelance@outlook.com',
-    channelLink: 'https://t.me/freelancers_bd_group',
-    payoutMethod: 'Rocket',
-    accountNumber: '018334455667',
-    nidNumber: '39482716384920',
-    documentUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
-    documentName: 'Student_ID_DU_Tanvir.png',
-    documentType: 'image/png',
-    documentSize: '950 KB',
-    status: 'pending',
-    submittedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-    notes: 'Manages a Telegram channel for 5,000 university students.',
-    referralCode: 'TANVIRDU',
-    availableBalance: 0,
-    totalEarned: 0,
-    paidOut: 0,
-    salesCount: 0,
-  },
-];
+const DEFAULT_APPLICATIONS: AffiliateApplication[] = [];
 
 export async function syncAffiliatesFromServer(): Promise<AffiliateApplication[]> {
   try {
     if (typeof window !== 'undefined') {
       const mergedMap = new Map<string, AffiliateApplication>();
 
-      // 1. Initial base applications
-      DEFAULT_APPLICATIONS.forEach((a) => {
-        if (a && a.id) mergedMap.set(a.id, a);
-      });
-
-      // 2. Existing local storage applications
+      // 1. Existing local storage applications (filter out any mock test data)
       try {
         const raw = localStorage.getItem(AFFILIATE_STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
             parsed.forEach((a: AffiliateApplication) => {
-              if (a && a.id) mergedMap.set(a.id, { ...mergedMap.get(a.id), ...a });
+              if (a && a.id && a.id !== 'AFF-2026-001' && a.id !== 'AFF-2026-002' && a.id !== 'AFF-2026-003') {
+                mergedMap.set(a.id, a);
+              }
             });
           }
         }
       } catch {}
 
-      // 3. Fetch from Firestore (Authoritative cloud store)
+      // 2. Fetch from Firestore (Authoritative cloud store)
       try {
         const firestoreAffs = await fetchAffiliatesFromFirestore();
-        if (Array.isArray(firestoreAffs) && firestoreAffs.length > 0) {
+        if (Array.isArray(firestoreAffs)) {
           firestoreAffs.forEach((a: AffiliateApplication) => {
-            if (a && a.id) {
+            if (a && a.id && a.id !== 'AFF-2026-001' && a.id !== 'AFF-2026-002' && a.id !== 'AFF-2026-003') {
               mergedMap.set(a.id, { ...mergedMap.get(a.id), ...a });
             }
           });
@@ -123,14 +46,14 @@ export async function syncAffiliatesFromServer(): Promise<AffiliateApplication[]
         console.warn('Firestore affiliates fetch notice:', err);
       }
 
-      // 4. Fetch from Server API
+      // 3. Fetch from Server API
       try {
         const res = await fetch('/api/affiliates');
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.affiliates)) {
             data.affiliates.forEach((a: AffiliateApplication) => {
-              if (a && a.id) {
+              if (a && a.id && a.id !== 'AFF-2026-001' && a.id !== 'AFF-2026-002' && a.id !== 'AFF-2026-003') {
                 mergedMap.set(a.id, { ...mergedMap.get(a.id), ...a });
               }
             });
@@ -141,13 +64,11 @@ export async function syncAffiliatesFromServer(): Promise<AffiliateApplication[]
       }
 
       const mergedList = Array.from(mergedMap.values());
-      if (mergedList.length > 0) {
-        try {
-          localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(mergedList));
-        } catch {}
-        window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
-        return mergedList;
-      }
+      try {
+        localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(mergedList));
+      } catch {}
+      window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
+      return mergedList;
     }
   } catch (e) {
     console.error('syncAffiliatesFromServer error:', e);
@@ -157,16 +78,19 @@ export async function syncAffiliatesFromServer(): Promise<AffiliateApplication[]
 
 export function getAffiliateApplications(): AffiliateApplication[] {
   try {
-    if (typeof localStorage === 'undefined') return DEFAULT_APPLICATIONS;
+    if (typeof localStorage === 'undefined') return [];
     const raw = localStorage.getItem(AFFILIATE_STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(DEFAULT_APPLICATIONS));
-      return DEFAULT_APPLICATIONS;
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_APPLICATIONS;
+    if (Array.isArray(parsed)) {
+      // Filter out stale mock test entries
+      return parsed.filter(
+        (a) => a && a.id && a.id !== 'AFF-2026-001' && a.id !== 'AFF-2026-002' && a.id !== 'AFF-2026-003'
+      );
+    }
+    return [];
   } catch (e) {
-    return DEFAULT_APPLICATIONS;
+    return [];
   }
 }
 

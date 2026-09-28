@@ -197,6 +197,40 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
     currentUser.referralCode ||
     `REF${currentUser.id.replace(/[^a-zA-Z0-9]/g, '').slice(-5).toUpperCase()}`;
 
+  const isApprovedAffiliate =
+    (affiliateData && affiliateData.status === 'approved') ||
+    currentUser.isAffiliate === true ||
+    currentUser.affiliateStatus === 'approved';
+
+  const isRestrictedAffiliate =
+    !isApprovedAffiliate &&
+    ((affiliateData && affiliateData.status === 'restricted') ||
+      currentUser.affiliateStatus === 'restricted');
+
+  const isPendingAffiliate =
+    !isApprovedAffiliate &&
+    !isRestrictedAffiliate &&
+    ((affiliateData && affiliateData.status === 'pending') ||
+      currentUser.affiliateStatus === 'pending');
+
+  const displayAffiliate = affiliateData || {
+    id: `AFF-${currentUser.id}`,
+    userId: currentUser.id,
+    fullName: currentUser.name || 'Affiliate User',
+    contactNumber: currentUser.phone || '',
+    whatsappNumber: currentUser.phone || '',
+    email: currentUser.email || '',
+    payoutMethod: 'bKash',
+    accountNumber: currentUser.phone || '',
+    status: 'approved' as const,
+    submittedAt: currentUser.createdAt || new Date().toISOString(),
+    referralCode: activeReferralCode,
+    availableBalance: currentUser.walletBalance || 0,
+    totalEarned: currentUser.walletBalance || 0,
+    paidOut: 0,
+    salesCount: 0,
+  };
+
   const affiliateReferralLink = `${window.location.origin}/?ref=${activeReferralCode}`;
 
   const handleCopyAffiliateLink = () => {
@@ -1286,7 +1320,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                 </div>
 
                 {/* SCENARIO 1: RESTRICTED AFFILIATE */}
-                {affiliateData && affiliateData.status === 'restricted' && (
+                {isRestrictedAffiliate && (
                   <div className="p-6 rounded-3xl bg-amber-50 border border-amber-200 text-amber-900 space-y-3">
                     <div className="flex items-center gap-3">
                       <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0" />
@@ -1304,7 +1338,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                 )}
 
                 {/* SCENARIO 2: APPROVED AFFILIATE (MATCHING REFERENCE SCREENSHOT) */}
-                {affiliateData && affiliateData.status === 'approved' && (
+                {isApprovedAffiliate && (
                   <div className="space-y-5">
                     {/* Top Premium Card: Available to Withdraw + Request payout */}
                     <div className="rounded-3xl bg-gradient-to-br from-[#0F172A] via-[#0F2942] to-[#0052FF] text-white p-6 sm:p-8 shadow-xl relative overflow-hidden">
@@ -1316,7 +1350,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                         <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                       </div>
                       <div className="text-3xl sm:text-4xl font-extrabold mt-1 tracking-tight text-white drop-shadow-xs">
-                        ৳{(affiliateData.availableBalance ?? 0).toLocaleString()}
+                        ৳{(displayAffiliate.availableBalance ?? 0).toLocaleString()}
                       </div>
 
                       {/* Request Payout Row */}
@@ -1353,7 +1387,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                       )}
 
                       <div className="mt-3 text-[11px] text-cyan-100/80">
-                        Min ৳100 · Paid to {affiliateData.payoutMethod || 'bKash'} ({affiliateData.accountNumber || currentUser.phone || 'Account'})
+                        Min ৳100 · Paid to {displayAffiliate.payoutMethod || 'bKash'} ({displayAffiliate.accountNumber || currentUser.phone || 'Account'})
                       </div>
                     </div>
 
@@ -1362,7 +1396,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                       <div className="grid grid-cols-3 divide-x divide-slate-100 text-center">
                         <div className="px-2">
                           <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                            ৳{(affiliateData.totalEarned ?? 0).toLocaleString()}
+                            ৳{(displayAffiliate.totalEarned ?? 0).toLocaleString()}
                           </div>
                           <div className="text-xs text-slate-500 mt-1 font-medium">
                             Total earned
@@ -1370,7 +1404,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                         </div>
                         <div className="px-2">
                           <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                            ৳{(affiliateData.paidOut ?? 0).toLocaleString()}
+                            ৳{(displayAffiliate.paidOut ?? 0).toLocaleString()}
                           </div>
                           <div className="text-xs text-slate-500 mt-1 font-medium">
                             Paid out
@@ -1378,7 +1412,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                         </div>
                         <div className="px-2">
                           <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                            {affiliateData.salesCount ?? 0}
+                            {displayAffiliate.salesCount ?? 0}
                           </div>
                           <div className="text-xs text-slate-500 mt-1 font-medium">
                             Sales
@@ -1647,7 +1681,7 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                 )}
 
                 {/* SCENARIO 3: PENDING REVIEW */}
-                {affiliateData && affiliateData.status === 'pending' && (
+                {isPendingAffiliate && (
                   <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_6px_rgba(0,0,0,0.02)] p-6 sm:p-8 space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
@@ -1664,17 +1698,17 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
                     </div>
 
                     <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5 text-slate-700">
-                      <div><span className="font-semibold">Applicant Name:</span> {affiliateData.fullName}</div>
-                      <div><span className="font-semibold">Contact:</span> {affiliateData.contactNumber}</div>
-                      <div><span className="font-semibold">Payout Method:</span> {affiliateData.payoutMethod} ({affiliateData.accountNumber})</div>
-                      <div><span className="font-semibold">NID / ID:</span> {affiliateData.nidNumber || 'Submitted'}</div>
-                      <div><span className="font-semibold">Document:</span> {affiliateData.documentName || 'Attached Document'}</div>
+                      <div><span className="font-semibold">Applicant Name:</span> {displayAffiliate.fullName}</div>
+                      <div><span className="font-semibold">Contact:</span> {displayAffiliate.contactNumber}</div>
+                      <div><span className="font-semibold">Payout Method:</span> {displayAffiliate.payoutMethod} ({displayAffiliate.accountNumber})</div>
+                      <div><span className="font-semibold">NID / ID:</span> {displayAffiliate.nidNumber || 'Submitted'}</div>
+                      <div><span className="font-semibold">Document:</span> {displayAffiliate.documentName || 'Attached Document'}</div>
                     </div>
                   </div>
                 )}
 
                 {/* SCENARIO 4: NOT APPLIED YET OR REJECTED (SHOW APPLICATION FORM) */}
-                {(!affiliateData || affiliateData.status === 'rejected') && (
+                {!isApprovedAffiliate && !isRestrictedAffiliate && !isPendingAffiliate && (
                   <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_6px_rgba(0,0,0,0.02)] p-6 sm:p-8 md:p-10">
                     <div className="flex items-start justify-between gap-4">
                       <div>

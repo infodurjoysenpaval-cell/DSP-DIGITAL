@@ -49,59 +49,15 @@ function writeJSON<T>(filePath: string, data: T): boolean {
   }
 }
 
-// Initial default affiliate applications
-const DEFAULT_AFFILIATES = [
-  {
-    id: 'AFF-2026-001',
-    userId: 'usr-aff-101',
-    fullName: 'Ariful Islam',
-    contactNumber: '01719876543',
-    whatsappNumber: '01719876543',
-    email: 'ariful.digital@gmail.com',
-    channelLink: 'https://facebook.com/arifulsoftwarehub',
-    payoutMethod: 'bKash',
-    accountNumber: '01719876543',
-    nidNumber: '19954718293847',
-    documentUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80',
-    documentName: 'NID_Card_Front_Ariful.jpg',
-    status: 'pending',
-    submittedAt: new Date(Date.now() - 3600000 * 14).toISOString(),
-    referralCode: 'ARIFUL26',
-    availableBalance: 0,
-    totalEarned: 0,
-    paidOut: 0,
-    salesCount: 0,
-  },
-  {
-    id: 'AFF-2026-002',
-    userId: 'usr-aff-102',
-    fullName: 'Farhana Sultana',
-    contactNumber: '01912345678',
-    whatsappNumber: '01912345678',
-    email: 'farhana.techbd@gmail.com',
-    channelLink: 'https://youtube.com/@FarhanaTechReviews',
-    payoutMethod: 'bKash',
-    accountNumber: '01912345678',
-    nidNumber: '28471928374619',
-    documentUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80',
-    documentName: 'Trade_License_FarhanaTech.jpg',
-    status: 'approved',
-    submittedAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-    reviewedAt: new Date(Date.now() - 3600000 * 20).toISOString(),
-    referralCode: 'SRZKJC',
-    availableBalance: 10,
-    totalEarned: 10,
-    paidOut: 0,
-    salesCount: 1,
-  },
-];
+// Initial default affiliate applications (empty array so only real signups appear)
+const DEFAULT_AFFILIATES: any[] = [];
 
 // Seed initial files if not present
 if (!fs.existsSync(PRODUCTS_FILE)) {
   writeJSON(PRODUCTS_FILE, PRODUCTS);
 }
 if (!fs.existsSync(AFFILIATES_FILE)) {
-  writeJSON(AFFILIATES_FILE, DEFAULT_AFFILIATES);
+  writeJSON(AFFILIATES_FILE, []);
 }
 if (!fs.existsSync(USERS_FILE)) {
   writeJSON(USERS_FILE, []);

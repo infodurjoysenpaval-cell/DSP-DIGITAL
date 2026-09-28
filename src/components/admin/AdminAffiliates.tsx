@@ -23,6 +23,7 @@ import {
   DollarSign,
   AlertTriangle,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { AffiliateApplication } from '../../types';
 import {
@@ -65,21 +66,18 @@ export const AdminAffiliates: React.FC = () => {
     window.addEventListener('dsp_affiliate_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
-    // Real-time listener for Firestore Affiliates with merge
+    // Real-time listener for Firestore Affiliates
     let unsubscribeFirestore: (() => void) | null = null;
     try {
       unsubscribeFirestore = listenAffiliatesFromFirestore((firestoreAffs) => {
         if (firestoreAffs && Array.isArray(firestoreAffs)) {
-          setApplications((prev) => {
-            const map = new Map<string, AffiliateApplication>();
-            prev.forEach((a) => map.set(a.id, a));
-            firestoreAffs.forEach((a) => map.set(a.id, { ...map.get(a.id), ...a }));
-            const merged = Array.from(map.values());
-            try {
-              localStorage.setItem('dsp_affiliate_applications', JSON.stringify(merged));
-            } catch {}
-            return merged;
-          });
+          const cleanAffs = firestoreAffs.filter(
+            (a) => a && a.id && a.id !== 'AFF-2026-001' && a.id !== 'AFF-2026-002' && a.id !== 'AFF-2026-003'
+          );
+          setApplications(cleanAffs);
+          try {
+            localStorage.setItem('dsp_affiliate_applications', JSON.stringify(cleanAffs));
+          } catch {}
         }
       });
     } catch {}
@@ -135,8 +133,10 @@ export const AdminAffiliates: React.FC = () => {
     id: string,
     newStatus: 'approved' | 'restricted' | 'rejected' | 'pending'
   ) => {
+    setApplications((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a))
+    );
     updateAffiliateStatus(id, newStatus);
-    reload();
     if (selectedAppForDoc && selectedAppForDoc.id === id) {
       setSelectedAppForDoc((prev) => (prev ? { ...prev, status: newStatus } : null));
     }
@@ -148,8 +148,8 @@ export const AdminAffiliates: React.FC = () => {
         `আপনি কি নিশ্চিত যে "${name || 'এই অ্যাফিলিয়েট'}" এর আবেদন বাতিল এবং সম্পূর্ণ রিমুভ করতে চান? এর ফলে তার ডাটা সিস্টেম থেকে সম্পূর্ণ মুছে যাবে।`
       )
     ) {
+      setApplications((prev) => prev.filter((a) => a.id !== id));
       deleteAffiliateApplication(id);
-      reload();
       if (selectedAppForDoc && selectedAppForDoc.id === id) {
         setSelectedAppForDoc(null);
       }
@@ -438,7 +438,7 @@ export const AdminAffiliates: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleStatusChange(app.id, 'approved')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-2xs cursor-pointer"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-2xs cursor-pointer"
                             title="অনুমোদন করুন (Approve)"
                           >
                             <Check className="w-3.5 h-3.5" />
@@ -446,28 +446,28 @@ export const AdminAffiliates: React.FC = () => {
                           </button>
                         )}
 
-                        {/* Restrict Button (can restrict approved or pending affiliates) */}
+                        {/* Restrict Button (can restrict approved affiliates) */}
                         {app.status === 'approved' && (
                           <button
                             type="button"
                             onClick={() => handleStatusChange(app.id, 'restricted')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-bold text-xs transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold text-xs transition-colors cursor-pointer"
                             title="স্থগিত করুন (Restrict Affiliate)"
                           >
-                            <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
                             <span>Restrict</span>
                           </button>
                         )}
 
-                        {/* Reject / Cancel Button (wipes affiliate data completely as requested) */}
+                        {/* Delete Button (Permanent Wipe from DB & Firestore) */}
                         <button
                           type="button"
                           onClick={() => handleCancelOrDelete(app.id, app.fullName)}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-xs transition-colors cursor-pointer"
-                          title="বাতিল ও রিমুভ করুন (Cancel & Delete)"
+                          title="সম্পূর্ণরূপে ডিলিট করুন (Permanently Delete)"
                         >
-                          <X className="w-3.5 h-3.5 text-rose-600" />
-                          <span>Cancel</span>
+                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Delete</span>
                         </button>
                       </div>
                     </td>
@@ -618,19 +618,20 @@ export const AdminAffiliates: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleStatusChange(selectedAppForDoc.id, 'restricted')}
-                    className="px-3.5 py-2 rounded-xl border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold transition-colors cursor-pointer"
+                    className="px-3.5 py-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition-colors cursor-pointer"
                   >
                     স্থগিত করুন (Restrict)
                   </button>
                 )}
 
-                {/* Reject / Cancel action */}
+                {/* Delete action */}
                 <button
                   type="button"
                   onClick={() => handleCancelOrDelete(selectedAppForDoc.id, selectedAppForDoc.fullName)}
-                  className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  বাতিল ও রিমুভ (Cancel & Delete)
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>সম্পূর্ণ মুছে ফেলুন (Delete)</span>
                 </button>
 
                 {/* Approve action */}
@@ -638,9 +639,10 @@ export const AdminAffiliates: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleStatusChange(selectedAppForDoc.id, 'approved')}
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
                   >
-                    অনুমোদন করুন (Approve)
+                    <Check className="w-4 h-4" />
+                    <span>অনুমোদন করুন (Approve)</span>
                   </button>
                 )}
               </div>

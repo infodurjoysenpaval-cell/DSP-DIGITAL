@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShoppingCart,
   Package,
@@ -13,47 +13,296 @@ import {
   TrendingUp,
   ArrowUpRight,
   Sparkles,
+  Inbox,
 } from 'lucide-react';
 import { getAdminOrders } from '../../utils/adminStore';
 import { getLiveProducts } from '../../utils/adminStore';
-import { getRegisteredUsers } from '../../utils/authStorage';
+import { getRegisteredUsers, getUserOrders } from '../../utils/authStorage';
+import { OrderDetails, Product } from '../../types';
 
 export const AdminOverview: React.FC = () => {
-  const [dateFilter, setDateFilter] = useState<'Today' | 'Yesterday' | 'Last 7 Days' | 'This Month' | 'All Time'>('Today');
+  const [dateFilter, setDateFilter] = useState<'Today' | 'Yesterday' | 'Last 7 Days' | 'This Month' | 'All Time'>('All Time');
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [chartPeriod, setChartPeriod] = useState<'Monthly' | 'Last Week' | 'Yearly'>('Last Week');
   const [showMore, setShowMore] = useState(false);
+  const [orders, setOrders] = useState<OrderDetails[]>(() => {
+    const adminOrders = getAdminOrders();
+    const userOrders = getUserOrders();
+    // Merge without duplicates
+    const map = new Map<string, OrderDetails>();
+    adminOrders.forEach((o) => map.set(o.orderId, o));
+    userOrders.forEach((o) => map.set(o.orderId, o));
+    return Array.from(map.values());
+  });
 
-  const orders = useMemo(() => getAdminOrders(), []);
-  const products = useMemo(() => getLiveProducts(), []);
+  const products: Product[] = useMemo(() => getLiveProducts(), []);
   const customers = useMemo(() => getRegisteredUsers(), []);
 
-  // Compute metric numbers
-  const totalRevenue = useMemo(() => orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0), [orders]);
-  const deliveredOrders = useMemo(() => orders.filter((o) => o.status === 'delivered'), [orders]);
-  const pendingOrders = useMemo(() => orders.filter((o) => o.status === 'pending' || !o.status), [orders]);
-  const confirmedOrders = useMemo(() => orders.filter((o) => o.status === 'processing'), [orders]);
-  const cancelledOrders = useMemo(() => orders.filter((o) => o.status === 'cancelled'), [orders]);
+  // Sync real-time updates
+  useEffect(() => {
+    const handleUpdate = () => {
+      const adminOrders = getAdminOrders();
+      const userOrders = getUserOrders();
+      const map = new Map<string, OrderDetails>();
+      adminOrders.forEach((o) => map.set(o.orderId, o));
+      userOrders.forEach((o) => map.set(o.orderId, o));
+      setOrders(Array.from(map.values()));
+    };
 
-  const formatTk = (amount: number) => `৳${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    window.addEventListener('dsp_orders_updated', handleUpdate);
+    window.addEventListener('dsp_order_created', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    // Initial fetch from server
+    fetch('/api/orders')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setOrders((prev) => {
+            const map = new Map<string, OrderDetails>();
+            prev.forEach((o) => map.set(o.orderId, o));
+            data.forEach((o) => map.set(o.orderId, o));
+            return Array.from(map.values());
+          });
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      window.removeEventListener('dsp_orders_updated', handleUpdate);
+      window.removeEventListener('dsp_order_created', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  // Filter orders by dateFilter
+  const filteredOrders = useMemo(() => {
+    if (dateFilter === 'All Time') return orders;
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const yesterday = new Date(now.getTime() - 86400000);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    return orders.filter((o) => {
+      if (!o.createdAt) return true;
+      const orderDateStr = new Date(o.createdAt).toISOString().split('T')[0];
+      if (dateFilter === 'Today') {
+        return orderDateStr === todayStr;
+      }
+      if (dateFilter === 'Yesterday') {
+        return orderDateStr === yesterdayStr;
+      }
+      if (dateFilter === 'Last 7 Days') {
+        const diff = (now.getTime() - new Date(o.createdAt).getTime()) / 86400000;
+        return diff <= 7;
+      }
+      if (dateFilter === 'This Month') {
+        const d = new Date(o.createdAt);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+      return true;
+    });
+  }, [orders, dateFilter]);
+
+  // Compute metric numbers dynamically from real filtered orders
+  const totalRevenue = useMemo(
+    () => filteredOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
+    [filteredOrders]
+  );
+  const deliveredOrders = useMemo(
+    () => filteredOrders.filter((o) => o.status === 'delivered'),
+    [filteredOrders]
+  );
+  const pendingOrders = useMemo(
+    () => filteredOrders.filter((o) => o.status === 'pending' || !o.status),
+    [filteredOrders]
+  );
+  const confirmedOrders = useMemo(
+    () => filteredOrders.filter((o) => o.status === 'processing'),
+    [filteredOrders]
+  );
+  const cancelledOrders = useMemo(
+    () => filteredOrders.filter((o) => o.status === 'cancelled'),
+    [filteredOrders]
+  );
+
+  const formatTk = (amount: number) =>
+    `৳${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // REAL DATA CALCULATION: Profit and Sales revenue
+  const chartData = useMemo(() => {
+    if (chartPeriod === 'Last Week') {
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      // Map JS day index (0=Sun, 1=Mon, ..., 6=Sat) to Mon..Sun
+      const daySales = [0, 0, 0, 0, 0, 0, 0];
+
+      filteredOrders.forEach((o) => {
+        if (!o.createdAt) return;
+        const d = new Date(o.createdAt);
+        const dayIdx = d.getDay(); // 0 is Sun
+        const targetIdx = dayIdx === 0 ? 6 : dayIdx - 1; // 0=Mon, 6=Sun
+        daySales[targetIdx] += o.totalAmount || 0;
+      });
+
+      const maxSale = Math.max(...daySales, 1);
+
+      return days.map((day, idx) => {
+        const sales = daySales[idx];
+        const profit = Math.round(sales * 0.55); // estimated 55% net profit margin
+        const salesPercent = sales > 0 ? Math.min(100, Math.max(12, Math.round((sales / maxSale) * 90))) : 0;
+        const profitPercent = sales > 0 ? Math.min(100, Math.max(8, Math.round((profit / maxSale) * 90))) : 0;
+        return {
+          label: day,
+          salesAmount: sales,
+          profitAmount: profit,
+          salesPercent,
+          profitPercent,
+        };
+      });
+    }
+
+    if (chartPeriod === 'Monthly') {
+      const weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+      const weekSales = [0, 0, 0, 0];
+
+      filteredOrders.forEach((o) => {
+        if (!o.createdAt) return;
+        const dateNum = new Date(o.createdAt).getDate();
+        const wIdx = Math.min(3, Math.floor((dateNum - 1) / 7));
+        weekSales[wIdx] += o.totalAmount || 0;
+      });
+
+      const maxSale = Math.max(...weekSales, 1);
+
+      return weeks.map((w, idx) => {
+        const sales = weekSales[idx];
+        const profit = Math.round(sales * 0.55);
+        const salesPercent = sales > 0 ? Math.min(100, Math.max(12, Math.round((sales / maxSale) * 90))) : 0;
+        const profitPercent = sales > 0 ? Math.min(100, Math.max(8, Math.round((profit / maxSale) * 90))) : 0;
+        return {
+          label: w,
+          salesAmount: sales,
+          profitAmount: profit,
+          salesPercent,
+          profitPercent,
+        };
+      });
+    }
+
+    // Yearly
+    const quarters = ['Q1 (Jan-Mar)', 'Q2 (Apr-Jun)', 'Q3 (Jul-Sep)', 'Q4 (Oct-Dec)'];
+    const qSales = [0, 0, 0, 0];
+
+    filteredOrders.forEach((o) => {
+      if (!o.createdAt) return;
+      const month = new Date(o.createdAt).getMonth();
+      const qIdx = Math.min(3, Math.floor(month / 3));
+      qSales[qIdx] += o.totalAmount || 0;
+    });
+
+    const maxSale = Math.max(...qSales, 1);
+
+    return quarters.map((q, idx) => {
+      const sales = qSales[idx];
+      const profit = Math.round(sales * 0.55);
+      const salesPercent = sales > 0 ? Math.min(100, Math.max(12, Math.round((sales / maxSale) * 90))) : 0;
+      const profitPercent = sales > 0 ? Math.min(100, Math.max(8, Math.round((profit / maxSale) * 90))) : 0;
+      return {
+        label: q,
+        salesAmount: sales,
+        profitAmount: profit,
+        salesPercent,
+        profitPercent,
+      };
+    });
+  }, [filteredOrders, chartPeriod]);
+
+  // REAL DATA CALCULATION: Sales by Category from real ordered items
+  const categoryStats = useMemo(() => {
+    const categoryTotals: Record<string, number> = {
+      'Operating Systems & Windows': 0,
+      'Antivirus & Security': 0,
+      'Design & Office Tools': 0,
+      'VPN & Subscriptions': 0,
+    };
+
+    let totalItemSales = 0;
+
+    filteredOrders.forEach((order) => {
+      if (Array.isArray(order.items) && order.items.length > 0) {
+        order.items.forEach((item) => {
+          const itemPrice =
+            item.selectedVariation?.salePrice ??
+            item.product?.salePrice ??
+            item.product?.regularPrice ??
+            0;
+          const itemTotal = itemPrice * (item.quantity || 1);
+          totalItemSales += itemTotal;
+          const nameLower = (item.product?.name || '').toLowerCase();
+
+          if (nameLower.includes('windows') || nameLower.includes('os') || nameLower.includes('server')) {
+            categoryTotals['Operating Systems & Windows'] += itemTotal;
+          } else if (nameLower.includes('antivirus') || nameLower.includes('kaspersky') || nameLower.includes('eset') || nameLower.includes('mcafee')) {
+            categoryTotals['Antivirus & Security'] += itemTotal;
+          } else if (nameLower.includes('canva') || nameLower.includes('office') || nameLower.includes('claude') || nameLower.includes('chatgpt') || nameLower.includes('grammarly') || nameLower.includes('adobe')) {
+            categoryTotals['Design & Office Tools'] += itemTotal;
+          } else {
+            categoryTotals['VPN & Subscriptions'] += itemTotal;
+          }
+        });
+      }
+    });
+
+    // If there are real sales, compute exact percentages
+    if (totalItemSales > 0) {
+      const entries = [
+        { name: 'Operating Systems & Windows', sales: categoryTotals['Operating Systems & Windows'], color: 'bg-blue-500' },
+        { name: 'Antivirus & Security', sales: categoryTotals['Antivirus & Security'], color: 'bg-emerald-500' },
+        { name: 'Design & Office Tools', sales: categoryTotals['Design & Office Tools'], color: 'bg-indigo-500' },
+        { name: 'VPN & Subscriptions', sales: categoryTotals['VPN & Subscriptions'], color: 'bg-amber-500' },
+      ];
+
+      return entries.map((e) => ({
+        ...e,
+        percent: Math.round((e.sales / totalItemSales) * 100),
+      }));
+    }
+
+    // Default real 0 state if no orders yet
+    return [
+      { name: 'Operating Systems & Windows', sales: 0, percent: 0, color: 'bg-blue-500' },
+      { name: 'Antivirus & Security', sales: 0, percent: 0, color: 'bg-emerald-500' },
+      { name: 'Design & Office Tools', sales: 0, percent: 0, color: 'bg-indigo-500' },
+      { name: 'VPN & Subscriptions', sales: 0, percent: 0, color: 'bg-amber-500' },
+    ];
+  }, [filteredOrders]);
+
+  // Top fastest growing category
+  const topCategory = useMemo(() => {
+    const sorted = [...categoryStats].sort((a, b) => b.sales - a.sales);
+    if (sorted[0] && sorted[0].sales > 0) {
+      return `${sorted[0].name} (${sorted[0].percent}%)`;
+    }
+    return 'Digital Licenses (Ready)';
+  }, [categoryStats]);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
-      {/* Top Header & Filter Controls Matching Screenshot 1 */}
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto antialiased">
+      {/* Top Header & Filter Controls Matching Screenshot */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-main-heading">
             Overview
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time sales, order fulfillment, and revenue metrics
+            Real-time live store analytics from database
           </p>
         </div>
 
         <div className="flex items-center gap-2 relative">
           <button
             onClick={() => setDateFilterOpen(!dateFilterOpen)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs transition-colors"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs transition-colors cursor-pointer"
           >
             <Calendar className="w-3.5 h-3.5 text-blue-600" />
             <span>Filter in Date</span>
@@ -62,14 +311,14 @@ export const AdminOverview: React.FC = () => {
           <div className="relative">
             <button
               onClick={() => setDateFilterOpen(!dateFilterOpen)}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs transition-colors"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs transition-colors cursor-pointer"
             >
               <span>{dateFilter}</span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
             {dateFilterOpen && (
-              <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 z-20">
+              <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 z-20 animate-in fade-in zoom-in-95">
                 {(['Today', 'Yesterday', 'Last 7 Days', 'This Month', 'All Time'] as const).map((period) => (
                   <button
                     key={period}
@@ -77,7 +326,7 @@ export const AdminOverview: React.FC = () => {
                       setDateFilter(period);
                       setDateFilterOpen(false);
                     }}
-                    className={`w-full text-left px-3.5 py-1.5 text-xs transition-colors ${
+                    className={`w-full text-left px-3.5 py-1.5 text-xs transition-colors cursor-pointer ${
                       dateFilter === period ? 'font-bold text-[#0052FF] bg-blue-50' : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
@@ -90,7 +339,7 @@ export const AdminOverview: React.FC = () => {
         </div>
       </div>
 
-      {/* 8 Curved Gradient Metric Cards Matching Screenshot 1 */}
+      {/* 8 Curved Gradient Metric Cards Matching Screenshot Exactly */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-5">
         {/* 1. Today Orders (Cyan/Sky Blue) */}
         <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 text-white bg-gradient-to-br from-[#29B6F6] to-[#0288D1] shadow-[0_8px_20px_rgba(2,136,209,0.22)]">
@@ -98,12 +347,11 @@ export const AdminOverview: React.FC = () => {
             <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
           <div className="text-[11px] sm:text-xs font-medium text-white/90 truncate">
-            Today Orders: {orders.length > 0 ? orders.length : 0}
+            Today Orders: {filteredOrders.length}
           </div>
           <div className="text-lg sm:text-2xl sm:text-3xl font-black mt-0.5 sm:mt-1 tracking-tight truncate">
             {formatTk(totalRevenue)}
           </div>
-          {/* Subtle background curved decoration */}
           <div className="absolute -right-6 -bottom-6 w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white/10 pointer-events-none"></div>
         </div>
 
@@ -130,7 +378,7 @@ export const AdminOverview: React.FC = () => {
             Confirmed: {confirmedOrders.length}
           </div>
           <div className="text-lg sm:text-2xl sm:text-3xl font-black mt-0.5 sm:mt-1 tracking-tight truncate">
-            {formatTk(confirmedOrders.reduce((sum, o) => sum + o.totalAmount, 0))}
+            {formatTk(confirmedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0))}
           </div>
           <div className="absolute -right-6 -bottom-6 w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white/10 pointer-events-none"></div>
         </div>
@@ -144,29 +392,29 @@ export const AdminOverview: React.FC = () => {
             Pending: {pendingOrders.length}
           </div>
           <div className="text-lg sm:text-2xl sm:text-3xl font-black mt-0.5 sm:mt-1 tracking-tight truncate">
-            {formatTk(pendingOrders.reduce((sum, o) => sum + o.totalAmount, 0))}
+            {formatTk(pendingOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0))}
           </div>
           <div className="absolute -right-6 -bottom-6 w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white/10 pointer-events-none"></div>
         </div>
 
-        {/* 5. Cancelled Orders (Red/Coral) */}
-        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 text-white bg-gradient-to-br from-[#FF5252] to-[#FF1744] shadow-[0_8px_20px_rgba(255,82,82,0.22)]">
+        {/* 5. Cancelled Orders (Vibrant Red) */}
+        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 text-white bg-gradient-to-br from-[#FF5252] to-[#D32F2F] shadow-[0_8px_20px_rgba(211,47,47,0.22)]">
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-2.5 sm:mb-4">
             <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
           <div className="text-[11px] sm:text-xs font-medium text-white/90 truncate">
             Cancelled: {cancelledOrders.length}
           </div>
-          <div className="flex items-baseline gap-1 sm:gap-2 mt-0.5 sm:mt-1">
-            <span className="text-lg sm:text-2xl sm:text-3xl font-black tracking-tight">৳0.00</span>
-            <span className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-black/20 text-white">
-              0%
+          <div className="text-lg sm:text-2xl sm:text-3xl font-black mt-0.5 sm:mt-1 tracking-tight truncate flex items-center gap-1.5">
+            <span>{formatTk(cancelledOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0))}</span>
+            <span className="text-[10px] font-bold bg-white/20 px-1.5 py-0.5 rounded-full">
+              {filteredOrders.length > 0 ? Math.round((cancelledOrders.length / filteredOrders.length) * 100) : 0}%
             </span>
           </div>
           <div className="absolute -right-6 -bottom-6 w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white/10 pointer-events-none"></div>
         </div>
 
-        {/* 6. Hold Orders (Amber/Orange) */}
+        {/* 6. Hold Orders (Warm Amber/Orange) */}
         <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 text-white bg-gradient-to-br from-[#FFA726] to-[#FB8C00] shadow-[0_8px_20px_rgba(251,140,0,0.22)]">
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-2.5 sm:mb-4">
             <Hand className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -180,7 +428,7 @@ export const AdminOverview: React.FC = () => {
           <div className="absolute -right-6 -bottom-6 w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white/10 pointer-events-none"></div>
         </div>
 
-        {/* 7. Delivered Orders (Violet/Purple) */}
+        {/* 7. Delivered Orders (Purple/Violet) */}
         <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 text-white bg-gradient-to-br from-[#7C4DFF] to-[#651FFF] shadow-[0_8px_20px_rgba(101,31,255,0.22)]">
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-2.5 sm:mb-4">
             <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -189,21 +437,21 @@ export const AdminOverview: React.FC = () => {
             Delivered: {deliveredOrders.length}
           </div>
           <div className="text-lg sm:text-2xl sm:text-3xl font-black mt-0.5 sm:mt-1 tracking-tight truncate">
-            {formatTk(deliveredOrders.reduce((sum, o) => sum + o.totalAmount, 0))}
+            {formatTk(deliveredOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0))}
           </div>
           <div className="absolute -right-6 -bottom-6 w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white/10 pointer-events-none"></div>
         </div>
 
         {/* 8. Read Orders (Teal/Ocean) */}
-        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 text-white bg-gradient-to-br from-[#00B4D8] to-[#0077B6] shadow-[0_8px_20px_rgba(0,180,216,0.22)]">
+        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 text-white bg-gradient-to-br from-[#00BCD4] to-[#0097A7] shadow-[0_8px_20px_rgba(0,151,167,0.22)]">
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-2.5 sm:mb-4">
             <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
           <div className="text-[11px] sm:text-xs font-medium text-white/90 truncate">
-            Read Orders: 0
+            Read Orders: {filteredOrders.length}
           </div>
           <div className="text-lg sm:text-2xl sm:text-3xl font-black mt-0.5 sm:mt-1 tracking-tight truncate">
-            ৳0.00
+            {formatTk(totalRevenue)}
           </div>
           <div className="absolute -right-6 -bottom-6 w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white/10 pointer-events-none"></div>
         </div>
@@ -213,7 +461,7 @@ export const AdminOverview: React.FC = () => {
       <div className="flex justify-center pt-1">
         <button
           onClick={() => setShowMore(!showMore)}
-          className="flex items-center gap-1.5 px-6 py-2 rounded-full border border-blue-200 bg-blue-50/50 hover:bg-blue-100/60 text-blue-600 text-xs font-bold transition-all"
+          className="flex items-center gap-1.5 px-6 py-2 rounded-full border border-blue-200 bg-blue-50/50 hover:bg-blue-100/60 text-blue-600 text-xs font-bold transition-all cursor-pointer"
         >
           <span>{showMore ? 'See Less' : 'See More'}</span>
           <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMore ? 'rotate-180' : ''}`} />
@@ -222,7 +470,7 @@ export const AdminOverview: React.FC = () => {
 
       {/* Expanded Metrics Drawer */}
       {showMore && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs animate-in fade-in">
           <div className="p-3">
             <span className="text-xs text-slate-500 font-medium">Total Store Products</span>
             <div className="text-xl font-bold text-slate-800 mt-1">{products.length} Products</div>
@@ -234,17 +482,21 @@ export const AdminOverview: React.FC = () => {
           <div className="p-3">
             <span className="text-xs text-slate-500 font-medium">Average Order Value</span>
             <div className="text-xl font-bold text-emerald-600 mt-1">
-              {formatTk(orders.length > 0 ? totalRevenue / orders.length : 1250)}
+              {formatTk(filteredOrders.length > 0 ? totalRevenue / filteredOrders.length : 0)}
             </div>
           </div>
           <div className="p-3">
-            <span className="text-xs text-slate-500 font-medium">Conversion Rate</span>
-            <div className="text-xl font-bold text-blue-600 mt-1">84.6%</div>
+            <span className="text-xs text-slate-500 font-medium">Delivered Ratio</span>
+            <div className="text-xl font-bold text-blue-600 mt-1">
+              {filteredOrders.length > 0
+                ? `${Math.round((deliveredOrders.length / filteredOrders.length) * 100)}%`
+                : '100%'}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Charts Section Matching Screenshot 1 */}
+      {/* Real Charts Section: Profit and Sales Revenue + Sales by Category */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
         {/* Profit and Sales Revenue Card */}
         <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-2xs">
@@ -253,7 +505,9 @@ export const AdminOverview: React.FC = () => {
               <h3 className="text-base font-extrabold text-slate-900 font-main-heading">
                 Profit and Sales revenue
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">Tracking daily gross sales vs net profit</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Tracking real sales from database ({chartPeriod})
+              </p>
             </div>
 
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100/80 text-xs font-semibold">
@@ -261,7 +515,7 @@ export const AdminOverview: React.FC = () => {
                 <button
                   key={period}
                   onClick={() => setChartPeriod(period)}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                     chartPeriod === period
                       ? 'bg-white text-slate-900 shadow-2xs font-bold'
                       : 'text-slate-500 hover:text-slate-800'
@@ -273,37 +527,33 @@ export const AdminOverview: React.FC = () => {
             </div>
           </div>
 
-          {/* Graphical Analytics Bar Chart Visualization */}
+          {/* Real Analytics Bar Chart Visualization */}
           <div className="overflow-x-auto pb-2 -mx-2 sm:mx-0 px-2">
             <div className="h-64 min-w-[380px] sm:min-w-0 flex items-end gap-3 sm:gap-6 pt-8 px-2 border-b border-slate-100 pb-3">
-              {[
-                { day: 'Mon', sales: 45, profit: 30, amount: '৳4,500' },
-                { day: 'Tue', sales: 70, profit: 50, amount: '৳7,000' },
-                { day: 'Wed', sales: 60, profit: 42, amount: '৳6,000' },
-                { day: 'Thu', sales: 85, profit: 62, amount: '৳8,500' },
-                { day: 'Fri', sales: 95, profit: 75, amount: '৳9,500' },
-                { day: 'Sat', sales: 80, profit: 58, amount: '৳8,000' },
-                { day: 'Sun', sales: 110, profit: 88, amount: '৳11,000' },
-              ].map((item, idx) => (
+              {chartData.map((item, idx) => (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative">
                   {/* Tooltip on hover */}
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded shadow whitespace-nowrap pointer-events-none z-10">
-                    Sales: {item.amount}
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-9 bg-slate-900 text-white text-[10px] px-2.5 py-1 rounded-lg shadow-lg whitespace-nowrap pointer-events-none z-10 font-mono">
+                    Sales: ৳{item.salesAmount.toLocaleString()} · Profit: ৳{item.profitAmount.toLocaleString()}
                   </div>
 
                   <div className="w-full flex items-end justify-center gap-1.5 h-44">
                     {/* Sales bar */}
                     <div
-                      style={{ height: `${item.sales}%` }}
-                      className="w-full max-w-[18px] bg-gradient-to-t from-[#0052FF] to-[#00DFBA] rounded-t-md transition-all group-hover:brightness-110"
+                      style={{ height: `${item.salesPercent}%` }}
+                      className={`w-full max-w-[18px] bg-gradient-to-t from-[#0052FF] to-[#00DFBA] rounded-t-md transition-all group-hover:brightness-110 ${
+                        item.salesPercent === 0 ? 'h-1 bg-slate-100' : ''
+                      }`}
                     ></div>
                     {/* Profit bar */}
                     <div
-                      style={{ height: `${item.profit}%` }}
-                      className="w-full max-w-[18px] bg-gradient-to-t from-[#2ECC71] to-[#60E89E] rounded-t-md transition-all group-hover:brightness-110"
+                      style={{ height: `${item.profitPercent}%` }}
+                      className={`w-full max-w-[18px] bg-gradient-to-t from-[#2ECC71] to-[#60E89E] rounded-t-md transition-all group-hover:brightness-110 ${
+                        item.profitPercent === 0 ? 'h-1 bg-slate-100' : ''
+                      }`}
                     ></div>
                   </div>
-                  <span className="text-[11px] font-semibold text-slate-500">{item.day}</span>
+                  <span className="text-[11px] font-semibold text-slate-500">{item.label}</span>
                 </div>
               ))}
             </div>
@@ -321,21 +571,16 @@ export const AdminOverview: React.FC = () => {
           </div>
         </div>
 
-        {/* Sales by Category Card */}
+        {/* Real Sales by Category Card */}
         <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-2xs flex flex-col justify-between">
           <div>
             <h3 className="text-base font-extrabold text-slate-900 font-main-heading">
               Sales by Category
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">Distribution across product types</p>
+            <p className="text-xs text-slate-400 mt-0.5">Real distribution from order items</p>
 
             <div className="mt-6 space-y-4">
-              {[
-                { name: 'Operating Systems & Windows', percent: 42, color: 'bg-blue-500' },
-                { name: 'Antivirus & Security', percent: 28, color: 'bg-emerald-500' },
-                { name: 'Design & Office Tools', percent: 18, color: 'bg-blue-500' },
-                { name: 'VPN & Subscriptions', percent: 12, color: 'bg-amber-500' },
-              ].map((cat, i) => (
+              {categoryStats.map((cat, i) => (
                 <div key={i} className="space-y-1.5">
                   <div className="flex justify-between text-xs font-medium">
                     <span className="text-slate-700">{cat.name}</span>
@@ -343,8 +588,8 @@ export const AdminOverview: React.FC = () => {
                   </div>
                   <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                     <div
-                      style={{ width: `${cat.percent}%` }}
-                      className={`h-full rounded-full ${cat.color}`}
+                      style={{ width: `${Math.max(cat.percent, 0)}%` }}
+                      className={`h-full rounded-full ${cat.color} transition-all duration-500`}
                     ></div>
                   </div>
                 </div>
@@ -354,9 +599,9 @@ export const AdminOverview: React.FC = () => {
 
           <div className="pt-6 border-t border-slate-100 flex items-center justify-between text-xs">
             <span className="text-slate-500">Fastest growing</span>
-            <span className="font-bold text-emerald-600 flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5" />
-              Windows Keys (+34%)
+            <span className="font-bold text-emerald-600 flex items-center gap-1 truncate max-w-[200px]">
+              <TrendingUp className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{topCategory}</span>
             </span>
           </div>
         </div>
