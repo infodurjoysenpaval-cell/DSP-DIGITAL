@@ -371,15 +371,8 @@ export function deleteAffiliateApplication(id: string): void {
 export function isApprovedAffiliate(user?: UserProfile | null): boolean {
   if (!user) return false;
   if (user.isAffiliate === true || user.affiliateStatus === 'approved') return true;
-  const all = getAffiliateApplications();
-  const cleanPhone = user.phone ? user.phone.replace(/[^0-9]/g, '') : '';
-  const match = all.find(
-    (a) =>
-      (a.userId && a.userId === user.id) ||
-      (a.email && user.email && a.email.toLowerCase() === user.email.toLowerCase()) ||
-      (cleanPhone && a.contactNumber && a.contactNumber.replace(/[^0-9]/g, '') === cleanPhone)
-  );
-  return match?.status === 'approved';
+  const app = getAffiliateForUser(user);
+  return app?.status === 'approved';
 }
 
 /**
@@ -389,13 +382,25 @@ export function getAffiliateForUser(user?: UserProfile | null): AffiliateApplica
   if (!user) return null;
   const all = getAffiliateApplications();
   const cleanPhone = user.phone ? user.phone.replace(/[^0-9]/g, '') : '';
+  const cleanEmail = (user.email || '').toLowerCase().trim();
   const match = all.find(
     (a) =>
       (a.userId && a.userId === user.id) ||
-      (a.email && user.email && a.email.toLowerCase() === user.email.toLowerCase()) ||
+      (cleanEmail && a.email && a.email.toLowerCase().trim() === cleanEmail) ||
       (cleanPhone && a.contactNumber && a.contactNumber.replace(/[^0-9]/g, '') === cleanPhone)
   );
-  return match || null;
+  if (match) return match;
+
+  // Fallback to local saved app if present
+  try {
+    const raw = localStorage.getItem(`dsp_affiliate_app_${user.id}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed) return parsed;
+    }
+  } catch {}
+
+  return null;
 }
 
 /**

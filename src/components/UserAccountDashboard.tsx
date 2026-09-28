@@ -154,9 +154,36 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
 
   // Sync with cloud on mount & real-time updates
   React.useEffect(() => {
-    // 1. Initial background sync
-    syncCurrentUserFromCloud(currentUser).catch(() => {});
-    syncAffiliatesFromServer().catch(() => {});
+    const doSync = async () => {
+      try {
+        const cloudUser = await syncCurrentUserFromCloud(currentUser);
+        if (cloudUser) {
+          onUserChange?.(cloudUser);
+        }
+        const affs = await syncAffiliatesFromServer();
+        if (Array.isArray(affs)) {
+          const cleanPhone = currentUser.phone ? currentUser.phone.replace(/[^0-9]/g, '') : '';
+          const cleanEmail = (currentUser.email || '').toLowerCase().trim();
+          const match = affs.find(
+            (a) =>
+              (a.userId && a.userId === currentUser.id) ||
+              (cleanEmail && a.email && a.email.toLowerCase().trim() === cleanEmail) ||
+              (cleanPhone && a.contactNumber && a.contactNumber.replace(/[^0-9]/g, '') === cleanPhone)
+          );
+          if (match) {
+            setAffiliateData(match);
+            if (match.status === 'approved') {
+              try {
+                localStorage.setItem(`dsp_affiliate_app_${currentUser.id}`, JSON.stringify(match));
+              } catch {}
+            }
+          }
+        }
+      } catch (err) {}
+    };
+
+    doSync();
+    const interval = setInterval(doSync, 4000);
 
     // 2. Local event listeners
     const handleAffUpdate = () => {
@@ -168,12 +195,31 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
 
     // 3. Firestore live listener
     const unsubscribe = listenAffiliatesFromFirestore((affs) => {
-      if (Array.isArray(affs) && affs.length > 0) {
-        setAffiliateData(getAffiliateForUser(currentUser));
+      if (Array.isArray(affs)) {
+        try {
+          localStorage.setItem('dsp_affiliate_applications', JSON.stringify(affs));
+        } catch {}
+        const cleanPhone = currentUser.phone ? currentUser.phone.replace(/[^0-9]/g, '') : '';
+        const cleanEmail = (currentUser.email || '').toLowerCase().trim();
+        const match = affs.find(
+          (a) =>
+            (a.userId && a.userId === currentUser.id) ||
+            (cleanEmail && a.email && a.email.toLowerCase().trim() === cleanEmail) ||
+            (cleanPhone && a.contactNumber && a.contactNumber.replace(/[^0-9]/g, '') === cleanPhone)
+        );
+        if (match) {
+          setAffiliateData(match);
+          if (match.status === 'approved') {
+            try {
+              localStorage.setItem(`dsp_affiliate_app_${currentUser.id}`, JSON.stringify(match));
+            } catch {}
+          }
+        }
       }
     });
 
     return () => {
+      clearInterval(interval);
       window.removeEventListener('dsp_affiliate_updated', handleAffUpdate);
       window.removeEventListener('dsp_user_updated', handleAffUpdate);
       window.removeEventListener('dsp_users_changed', handleAffUpdate);
@@ -184,9 +230,24 @@ export const UserAccountDashboard: React.FC<UserAccountDashboardProps> = ({
   const handleManualSyncAffiliate = async () => {
     setIsSyncingAffiliate(true);
     try {
-      await syncCurrentUserFromCloud(currentUser);
-      await syncAffiliatesFromServer();
-      setAffiliateData(getAffiliateForUser(currentUser));
+      const cloudUser = await syncCurrentUserFromCloud(currentUser);
+      if (cloudUser) {
+        onUserChange?.(cloudUser);
+      }
+      const affs = await syncAffiliatesFromServer();
+      if (Array.isArray(affs)) {
+        const cleanPhone = currentUser.phone ? currentUser.phone.replace(/[^0-9]/g, '') : '';
+        const cleanEmail = (currentUser.email || '').toLowerCase().trim();
+        const match = affs.find(
+          (a) =>
+            (a.userId && a.userId === currentUser.id) ||
+            (cleanEmail && a.email && a.email.toLowerCase().trim() === cleanEmail) ||
+            (cleanPhone && a.contactNumber && a.contactNumber.replace(/[^0-9]/g, '') === cleanPhone)
+        );
+        if (match) {
+          setAffiliateData(match);
+        }
+      }
     } finally {
       setTimeout(() => setIsSyncingAffiliate(false), 500);
     }
