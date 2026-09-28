@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "user": {
+      "title": "User",
+      "description": "User account profile and activity details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique user ID" },
+        "name": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "phone": { "type": "string", "description": "User contact phone number" },
+        "role": { "type": "string", "enum": ["customer", "admin"], "description": "User access role" },
+        "adminRole": { "type": "string", "description": "Vendor or store admin role" },
+        "walletBalance": { "type": "number", "description": "Customer wallet balance" },
+        "referralCode": { "type": "string", "description": "User referral code" },
+        "affiliateStatus": { "type": "string", "enum": ["pending", "approved", "restricted", "rejected"], "description": "Affiliate application status" },
+        "isAffiliate": { "type": "boolean", "description": "Whether user is an approved affiliate" },
+        "avatar": { "type": "string", "description": "Avatar image URL" },
+        "createdAt": { "type": "string", "description": "Account creation timestamp" },
+        "lastLoginAt": { "type": "string", "description": "Last login timestamp" },
+        "loginCount": { "type": "number", "description": "Total number of logins" },
+        "status": { "type": "string", "enum": ["active", "inactive"], "description": "User account status" }
+      },
+      "required": ["id", "name", "email"]
+    },
+    "affiliate": {
+      "title": "Affiliate",
+      "description": "Affiliate partner application and commission data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique affiliate application ID" },
+        "userId": { "type": "string", "description": "Linked user account ID" },
+        "fullName": { "type": "string", "description": "Full name of the affiliate applicant" },
+        "contactNumber": { "type": "string", "description": "Applicant primary phone number" },
+        "whatsappNumber": { "type": "string", "description": "Applicant WhatsApp number" },
+        "email": { "type": "string", "format": "email", "description": "Applicant email address" },
+        "channelLink": { "type": "string", "description": "Social media or promotional channel link" },
+        "payoutMethod": { "type": "string", "description": "Preferred payout method" },
+        "accountNumber": { "type": "string", "description": "Account number for receiving payouts" },
+        "nidNumber": { "type": "string", "description": "National ID card number" },
+        "documentUrl": { "type": "string", "description": "URL of uploaded verification document" },
+        "documentName": { "type": "string", "description": "File name of verification document" },
+        "status": { "type": "string", "enum": ["pending", "approved", "restricted", "rejected"], "description": "Application review status" },
+        "submittedAt": { "type": "string", "description": "Submission timestamp" },
+        "reviewedAt": { "type": "string", "description": "Review timestamp" },
+        "notes": { "type": "string", "description": "Admin review notes" },
+        "referralCode": { "type": "string", "description": "Unique referral code assigned to affiliate" },
+        "availableBalance": { "type": "number", "description": "Available commission balance in BDT" },
+        "totalEarned": { "type": "number", "description": "Total earned commission in BDT" },
+        "paidOut": { "type": "number", "description": "Total paid out commission in BDT" },
+        "salesCount": { "type": "number", "description": "Number of successful referral sales" }
+      },
+      "required": ["id", "fullName", "contactNumber", "status"]
+    },
+    "product": {
+      "title": "Product",
+      "description": "Digital product catalog item",
+      "type": "object",
+      "properties": {
+        "_id": { "type": "string", "description": "Unique product ID" },
+        "name": { "type": "string", "description": "Product title" },
+        "slug": { "type": "string", "description": "URL slug" },
+        "salePrice": { "type": "number", "description": "Sale price in BDT" },
+        "regularPrice": { "type": "number", "description": "Regular price in BDT" },
+        "stock": { "type": "number", "description": "Available stock quantity" },
+        "openingStock": { "type": "number", "description": "Initial stock quantity" },
+        "shortDescription": { "type": "string", "description": "Short summary description" },
+        "description": { "type": "string", "description": "Full product description" },
+        "isPublished": { "type": "boolean", "description": "Whether product is published live" },
+        "isVariation": { "type": "boolean", "description": "Whether product has variants" },
+        "images": { "type": "array", "description": "List of product image URLs or compressed media" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      },
+      "required": ["_id", "name", "salePrice"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "Registered users and customer profiles"
+    },
+    "/affiliates/{affiliateId}": {
+      "schema": "affiliate",
+      "description": "Affiliate applications and partner accounts"
+    },
+    "/products/{productId}": {
+      "schema": "product",
+      "description": "Store products and catalog items"
+    }
+  }
+}

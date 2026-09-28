@@ -138,6 +138,9 @@ export interface UserProfile {
   authProvider?: 'google' | 'firebase' | 'email' | 'password';
   isAffiliate?: boolean;
   affiliateStatus?: 'pending' | 'approved' | 'rejected' | 'restricted';
+  lastLoginAt?: string;
+  loginCount?: number;
+  status?: string;
 }
 
 export interface OrderDetails {

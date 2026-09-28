@@ -26,9 +26,11 @@ import {
 import { AffiliateApplication } from '../../types';
 import {
   getAffiliateApplications,
+  syncAffiliatesFromServer,
   updateAffiliateStatus,
   deleteAffiliateApplication,
 } from '../../utils/affiliateStorage';
+import { listenAffiliatesFromFirestore } from '../../utils/firebase';
 
 export const AdminAffiliates: React.FC = () => {
   const [applications, setApplications] = useState<AffiliateApplication[]>(() =>
@@ -43,12 +45,49 @@ export const AdminAffiliates: React.FC = () => {
 
   const reload = () => {
     setApplications(getAffiliateApplications());
+    syncAffiliatesFromServer().then((loaded) => {
+      if (loaded && Array.isArray(loaded)) setApplications(loaded);
+    });
   };
 
   useEffect(() => {
-    const handleUpdate = () => reload();
+    reload();
+    const handleUpdate = () => {
+      setApplications(getAffiliateApplications());
+    };
     window.addEventListener('dsp_affiliate_updated', handleUpdate);
-    return () => window.removeEventListener('dsp_affiliate_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    // Real-time listener for Firestore Affiliates
+    let unsubscribeFirestore: (() => void) | null = null;
+    try {
+      unsubscribeFirestore = listenAffiliatesFromFirestore((firestoreAffs) => {
+        if (firestoreAffs && Array.isArray(firestoreAffs) && firestoreAffs.length > 0) {
+          setApplications(firestoreAffs);
+          localStorage.setItem('dsp_affiliate_applications', JSON.stringify(firestoreAffs));
+        }
+      });
+    } catch {}
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('dsp_affiliate_channel');
+      bc.onmessage = () => reload();
+    } catch {}
+
+    const interval = setInterval(() => {
+      syncAffiliatesFromServer().then((loaded) => {
+        if (loaded && Array.isArray(loaded)) setApplications(loaded);
+      });
+    }, 6000);
+
+    return () => {
+      window.removeEventListener('dsp_affiliate_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+      if (unsubscribeFirestore) unsubscribeFirestore();
+      if (bc) bc.close();
+      clearInterval(interval);
+    };
   }, []);
 
   const filteredApps = useMemo(() => {
@@ -85,6 +124,20 @@ export const AdminAffiliates: React.FC = () => {
     reload();
     if (selectedAppForDoc && selectedAppForDoc.id === id) {
       setSelectedAppForDoc((prev) => (prev ? { ...prev, status: newStatus } : null));
+    }
+  };
+
+  const handleCancelOrDelete = (id: string, name?: string) => {
+    if (
+      window.confirm(
+        `আপনি কি নিশ্চিত যে "${name || 'এই অ্যাফিলিয়েট'}" এর আবেদন বাতিল এবং সম্পূর্ণ রিমুভ করতে চান? এর ফলে তার ডাটা সিস্টেম থেকে সম্পূর্ণ মুছে যাবে।`
+      )
+    ) {
+      deleteAffiliateApplication(id);
+      reload();
+      if (selectedAppForDoc && selectedAppForDoc.id === id) {
+        setSelectedAppForDoc(null);
+      }
     }
   };
 
@@ -378,18 +431,16 @@ export const AdminAffiliates: React.FC = () => {
                           </button>
                         )}
 
-                        {/* Reject / Cancel Button (can cancel approved or restricted affiliates) */}
-                        {app.status !== 'rejected' && (
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(app.id, 'rejected')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-xs transition-colors cursor-pointer"
-                            title="বাতিল করুন (Cancel/Reject Affiliate)"
-                          >
-                            <X className="w-3.5 h-3.5 text-rose-600" />
-                            <span>Cancel</span>
-                          </button>
-                        )}
+                        {/* Reject / Cancel Button (wipes affiliate data completely as requested) */}
+                        <button
+                          type="button"
+                          onClick={() => handleCancelOrDelete(app.id, app.fullName)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-xs transition-colors cursor-pointer"
+                          title="বাতিল ও রিমুভ করুন (Cancel & Delete)"
+                        >
+                          <X className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Cancel</span>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -546,15 +597,13 @@ export const AdminAffiliates: React.FC = () => {
                 )}
 
                 {/* Reject / Cancel action */}
-                {selectedAppForDoc.status !== 'rejected' && (
-                  <button
-                    type="button"
-                    onClick={() => handleStatusChange(selectedAppForDoc.id, 'rejected')}
-                    className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    বাতিল করুন (Cancel)
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => handleCancelOrDelete(selectedAppForDoc.id, selectedAppForDoc.fullName)}
+                  className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  বাতিল ও রিমুভ (Cancel & Delete)
+                </button>
 
                 {/* Approve action */}
                 {selectedAppForDoc.status !== 'approved' && (

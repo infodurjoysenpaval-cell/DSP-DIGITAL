@@ -97,3 +97,12 @@
   font-weight: 500 !important;
 }
 
+/* Remove all borders from product image container and image */
+#product-image-container,
+#product-image-container > img {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+

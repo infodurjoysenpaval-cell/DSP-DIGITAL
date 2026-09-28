@@ -1,4 +1,5 @@
 import { UserProfile, OrderDetails } from '../types';
+import { syncUserToFirestore, fetchUsersFromFirestore, deleteUserFromFirestore } from './firebase';
 
 const CURRENT_USER_KEY = 'dsp_current_user';
 const REGISTERED_USERS_KEY = 'dsp_registered_users';
@@ -26,6 +27,64 @@ const generateReferralCode = (name: string): string => {
   const prefix = name.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'DSP';
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);
   return `${prefix}${randomSuffix}`;
+};
+
+export const syncUserToServer = async (user: any) => {
+  try {
+    if (typeof window !== 'undefined') {
+      // 1. Sync to Firestore for real-time admin sync & cloud persistence
+      syncUserToFirestore(user).catch(() => {});
+
+      // 2. Sync to server
+      fetch('/api/users/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user),
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            if (data.users && Array.isArray(data.users)) {
+              localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(data.users));
+              window.dispatchEvent(new CustomEvent('dsp_users_changed'));
+            }
+          }
+        })
+        .catch(() => {});
+
+      try {
+        const bc = new BroadcastChannel('dsp_user_channel');
+        bc.postMessage({ type: 'USER_SYNCED', user });
+        bc.close();
+      } catch {}
+    }
+  } catch {}
+};
+
+export const fetchUsersFromServer = async (): Promise<StoredUserAccount[]> => {
+  try {
+    if (typeof window !== 'undefined') {
+      // 1. Fetch from Firestore first
+      const firestoreUsers = await fetchUsersFromFirestore();
+      if (firestoreUsers && Array.isArray(firestoreUsers) && firestoreUsers.length > 0) {
+        localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(firestoreUsers));
+        window.dispatchEvent(new CustomEvent('dsp_users_changed'));
+        return firestoreUsers;
+      }
+
+      // 2. Fallback to server
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.users && Array.isArray(data.users) && data.users.length > 0) {
+          localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(data.users));
+          window.dispatchEvent(new CustomEvent('dsp_users_changed'));
+          return data.users;
+        }
+      }
+    }
+  } catch {}
+  return getRegisteredUsers();
 };
 
 export const getRegisteredUsers = (): StoredUserAccount[] => {
@@ -172,6 +231,15 @@ export const loginUser = (
     };
   }
 
+  // Update user with login activity
+  found.lastLoginAt = new Date().toISOString();
+  found.loginCount = (found.loginCount || 0) + 1;
+  found.status = 'active';
+
+  try {
+    localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+  } catch (e) {}
+
   const profile: UserProfile = {
     id: found.id,
     name: found.name,
@@ -182,11 +250,19 @@ export const loginUser = (
     referralCode: found.referralCode || generateReferralCode(found.name),
     referredBy: found.referredBy,
     createdAt: found.createdAt,
+    lastLoginAt: found.lastLoginAt,
+    loginCount: found.loginCount,
+    status: 'active',
   };
 
   try {
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(profile));
   } catch (e) {}
+
+  // Sync to server immediately so admin panel gets user data in real-time
+  syncUserToServer(found);
+  window.dispatchEvent(new CustomEvent('dsp_users_changed'));
+  window.dispatchEvent(new CustomEvent('dsp_user_updated', { detail: profile }));
 
   return { success: true, message: 'Logged in successfully!', user: profile };
 };
@@ -250,6 +326,10 @@ export const saveGoogleUser = (googleProfile: UserProfile): UserProfile => {
   try {
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(profile));
   } catch (e) {}
+
+  // Sync to server so admin panel gets real-time data
+  syncUserToServer(profile);
+  window.dispatchEvent(new CustomEvent('dsp_users_changed'));
 
   return profile;
 };
@@ -361,6 +441,10 @@ export const registerUser = (
   try {
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(profile));
   } catch (e) {}
+
+  // Sync to server so admin panel gets real-time data
+  syncUserToServer(newUser);
+  window.dispatchEvent(new CustomEvent('dsp_users_changed'));
 
   return { success: true, message: 'Congratulations! Your account has been created successfully.', user: profile };
 };

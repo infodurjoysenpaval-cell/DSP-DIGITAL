@@ -1,0 +1,87 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "info.durjoysenpaval@gmail.com" ||
+        request.auth.token.email == "admin@gmail.com" ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidUser(data) {
+      return data.id is string &&
+             data.name is string &&
+             data.name.size() <= 200;
+    }
+
+    function isValidAffiliate(data) {
+      return data.id is string &&
+             data.fullName is string &&
+             data.fullName.size() <= 200 &&
+             data.contactNumber is string;
+    }
+
+    function isValidProduct(data) {
+      return data._id is string &&
+             data.name is string &&
+             data.name.size() <= 300 &&
+             data.salePrice is number;
+    }
+
+    // Connection testing
+    match /test/{testId} {
+      allow read, write: if true;
+    }
+
+    // Admins
+    match /admins/{adminId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Products Catalog: Read by anyone, writable with schema validation
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update: if isValidId(productId) && isValidProduct(incoming());
+      allow delete: if isValidId(productId);
+    }
+
+    // Users Collection: User accounts and customer data
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isValidId(userId) && isValidUser(incoming());
+      allow delete: if isValidId(userId);
+    }
+
+    // Affiliates Collection: Partner applications & registrations
+    match /affiliates/{affiliateId} {
+      allow read: if true;
+      allow create, update: if isValidId(affiliateId) && isValidAffiliate(incoming());
+      allow delete: if isValidId(affiliateId);
+    }
+  }
+}

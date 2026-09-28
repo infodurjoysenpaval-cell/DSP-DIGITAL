@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   Plus,
@@ -12,8 +12,10 @@ import {
   Edit2,
   Shield,
   Phone,
+  Clock,
 } from 'lucide-react';
-import { getRegisteredUsers, registerUser, StoredUserAccount } from '../../utils/authStorage';
+import { getRegisteredUsers, registerUser, fetchUsersFromServer, StoredUserAccount } from '../../utils/authStorage';
+import { listenUsersFromFirestore, deleteUserFromFirestore } from '../../utils/firebase';
 
 export const AdminCustomers: React.FC = () => {
   const [users, setUsers] = useState<StoredUserAccount[]>(() => getRegisteredUsers());
@@ -32,7 +34,58 @@ export const AdminCustomers: React.FC = () => {
 
   const reloadUsers = () => {
     setUsers(getRegisteredUsers());
+    fetchUsersFromServer().then((loaded) => {
+      if (loaded && Array.isArray(loaded) && loaded.length > 0) {
+        setUsers(loaded);
+      }
+    });
   };
+
+  useEffect(() => {
+    reloadUsers();
+
+    const handleUpdate = () => {
+      setUsers(getRegisteredUsers());
+    };
+
+    window.addEventListener('dsp_users_changed', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    // Subscribe to Firestore Users in real-time
+    let unsubscribeFirestore: (() => void) | null = null;
+    try {
+      unsubscribeFirestore = listenUsersFromFirestore((firestoreUsers) => {
+        if (firestoreUsers && Array.isArray(firestoreUsers) && firestoreUsers.length > 0) {
+          setUsers(firestoreUsers);
+          localStorage.setItem('dsp_registered_users', JSON.stringify(firestoreUsers));
+        }
+      });
+    } catch {}
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('dsp_user_channel');
+      bc.onmessage = () => {
+        reloadUsers();
+      };
+    } catch {}
+
+    const interval = setInterval(() => {
+      fetchUsersFromServer().then((loaded) => {
+        if (loaded && Array.isArray(loaded) && loaded.length > 0) {
+          setUsers(loaded);
+        }
+      });
+    }, 6000);
+
+    return () => {
+      window.removeEventListener('dsp_users_changed', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+      if (unsubscribeFirestore) unsubscribeFirestore();
+      if (bc) bc.close();
+      clearInterval(interval);
+    };
+  }, []);
 
   const filteredUsers = users.filter((u) => {
     if (!searchQuery.trim()) return true;
@@ -80,9 +133,11 @@ export const AdminCustomers: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = (id: string, name: string) => {
+  const handleDeleteUser = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to remove user "${name}"?`)) {
       try {
+        deleteUserFromFirestore(id).catch(() => {});
+        fetch(`/api/users/${id}`, { method: 'DELETE' }).catch(() => {});
         const raw = localStorage.getItem('dsp_registered_users');
         if (raw) {
           const allUsers = JSON.parse(raw);

@@ -26,6 +26,7 @@ import {
   deleteLiveProduct,
 } from '../../utils/adminStore';
 import { compressImageFile } from '../../utils/imageCompressor';
+import { listenProductsFromFirestore } from '../../utils/firebase';
 
 interface AdminProductsProps {
   onViewProductOnSite?: (product: Product) => void;
@@ -67,6 +68,28 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
   const reloadProducts = () => {
     setProducts(getLiveProducts());
   };
+
+  // Real-time synchronization with Firestore and local store events
+  React.useEffect(() => {
+    const handleUpdate = () => {
+      setProducts(getLiveProducts());
+    };
+    window.addEventListener('dsp_products_updated', handleUpdate);
+
+    let unsubscribeFirestore: (() => void) | null = null;
+    try {
+      unsubscribeFirestore = listenProductsFromFirestore((liveProds) => {
+        if (liveProds && Array.isArray(liveProds) && liveProds.length > 0) {
+          setProducts(liveProds);
+        }
+      });
+    } catch {}
+
+    return () => {
+      window.removeEventListener('dsp_products_updated', handleUpdate);
+      if (unsubscribeFirestore) unsubscribeFirestore();
+    };
+  }, []);
 
   // Filter products by tab & search
   const filteredProducts = useMemo(() => {
@@ -128,7 +151,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onViewProductOnSit
       const compressedResults: string[] = [];
       for (const file of fileList) {
         try {
-          const compressed = await compressImageFile(file, 1000, 0.82);
+          const compressed = await compressImageFile(file, 800, 0.76);
           if (compressed) {
             compressedResults.push(compressed);
           }

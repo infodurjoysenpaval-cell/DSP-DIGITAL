@@ -1,6 +1,13 @@
 import { Product, OrderDetails, UserProfile } from '../types';
 import { PRODUCTS, SHOP_INFO } from '../data/storeData';
 import { getRegisteredUsers, getUserOrders } from './authStorage';
+import { idbSetAll, idbGetAll } from './idbStorage';
+import {
+  syncProductToFirestore,
+  deleteProductFromFirestore,
+  fetchProductsFromFirestore,
+  listenProductsFromFirestore,
+} from './firebase';
 
 const LIVE_PRODUCTS_KEY = 'dsp_live_products_v1';
 const CUSTOM_PRODUCTS_KEY = 'dsp_custom_products_v1';
@@ -391,6 +398,66 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
 // ---------------- PRODUCTS ----------------
 let memoryProductsCache: Product[] | null = null;
+let isPersistenceInitialized = false;
+
+export const initProductsPersistence = async () => {
+  if (isPersistenceInitialized || typeof window === 'undefined') return;
+  isPersistenceInitialized = true;
+
+  try {
+    // 1. Try reading from IndexedDB first for instant local rendering
+    const idbProds = await idbGetAll<Product>('products');
+    if (idbProds && Array.isArray(idbProds) && idbProds.length > 0) {
+      memoryProductsCache = idbProds;
+      window.dispatchEvent(new Event('dsp_products_updated'));
+    }
+
+    // 2. Fetch from Firebase Firestore for authoritative cloud persistence
+    const firestoreProds = await fetchProductsFromFirestore();
+    if (firestoreProds && Array.isArray(firestoreProds) && firestoreProds.length > 0) {
+      memoryProductsCache = firestoreProds;
+      await idbSetAll('products', firestoreProds);
+      window.dispatchEvent(new Event('dsp_products_updated'));
+    } else {
+      // If Firestore is completely fresh, seed default PRODUCTS into Firestore
+      const initialSeed = memoryProductsCache || PRODUCTS;
+      for (const p of initialSeed) {
+        syncProductToFirestore(p).catch(() => {});
+      }
+    }
+
+    // 3. Listen to live real-time changes from Firestore
+    try {
+      listenProductsFromFirestore((liveProds) => {
+        if (liveProds && Array.isArray(liveProds) && liveProds.length > 0) {
+          memoryProductsCache = liveProds;
+          idbSetAll('products', liveProds).catch(() => {});
+          window.dispatchEvent(new Event('dsp_products_updated'));
+        }
+      });
+    } catch {}
+
+    // 4. Fallback sync with full-stack server
+    const res = await fetch('/api/products');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+        if (!memoryProductsCache || memoryProductsCache.length === 0) {
+          memoryProductsCache = data.products;
+          await idbSetAll('products', data.products);
+          window.dispatchEvent(new Event('dsp_products_updated'));
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Product persistence notice:', err);
+  }
+};
+
+// Auto-run persistence init in browser
+if (typeof window !== 'undefined') {
+  setTimeout(() => initProductsPersistence(), 30);
+}
 
 export const getCustomProducts = (): Product[] => {
   try {
@@ -423,6 +490,7 @@ export const syncInitialProducts = (defaults: Product[]) => {
   if (!memoryProductsCache) {
     getLiveProducts();
   }
+  initProductsPersistence();
 };
 
 export const getLiveProducts = (): Product[] => {
@@ -480,6 +548,17 @@ export const getLiveProducts = (): Product[] => {
 export const saveLiveProducts = (products: Product[]) => {
   memoryProductsCache = [...products];
 
+  // Save to IndexedDB immediately (guarantees images & products NEVER vanish on refresh)
+  if (typeof window !== 'undefined') {
+    idbSetAll('products', products).catch(() => {});
+
+    try {
+      const bc = new BroadcastChannel('dsp_products_channel');
+      bc.postMessage({ type: 'PRODUCTS_UPDATED' });
+      bc.close();
+    } catch {}
+  }
+
   const defaultIdSet = new Set(PRODUCTS.map((p) => p._id));
   const currentIdSet = new Set(products.map((p) => p._id));
 
@@ -511,7 +590,7 @@ export const saveLiveProducts = (products: Product[]) => {
   try {
     localStorage.setItem(LIVE_PRODUCTS_KEY, JSON.stringify(products));
   } catch (e) {
-    console.warn('Full products exceeded localStorage quota; relying on delta storage.', e);
+    console.warn('Full products exceeded localStorage quota; relying on IndexedDB & delta storage.', e);
   }
 
   try {
@@ -575,6 +654,19 @@ export const addLiveProduct = (newProd: Partial<Product>): Product => {
   // Prepend new product so it appears at top of admin & store
   const updated = [created, ...current.filter((p) => p._id !== createdId)];
   saveLiveProducts(updated);
+
+  // Sync with Firestore for persistent cloud storage
+  syncProductToFirestore(created).catch(() => {});
+
+  // Sync with server
+  if (typeof window !== 'undefined') {
+    fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(created),
+    }).catch(() => {});
+  }
+
   return created;
 };
 
@@ -625,6 +717,19 @@ export const updateLiveProduct = (id: string, updates: Partial<Product>): boolea
   }
 
   saveLiveProducts([...current]);
+
+  // Sync update with Firestore
+  syncProductToFirestore(current[index]).catch(() => {});
+
+  // Sync update with server
+  if (typeof window !== 'undefined') {
+    fetch(`/api/products/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(current[index]),
+    }).catch(() => {});
+  }
+
   return true;
 };
 
@@ -647,6 +752,15 @@ export const deleteLiveProduct = (id: string): boolean => {
   } catch {}
 
   saveLiveProducts(filtered);
+
+  // Sync deletion with Firestore
+  deleteProductFromFirestore(id).catch(() => {});
+
+  // Sync deletion with server
+  if (typeof window !== 'undefined') {
+    fetch(`/api/products/${id}`, { method: 'DELETE' }).catch(() => {});
+  }
+
   return true;
 };
 

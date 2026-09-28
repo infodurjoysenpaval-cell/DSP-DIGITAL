@@ -135,7 +135,8 @@ export default function App() {
         }
         const prodParam = url.searchParams.get('product');
         if (prodParam) {
-          const found = PRODUCTS.find((p) => p.slug === prodParam || p._id === prodParam);
+          const liveList = getLiveProducts();
+          const found = liveList.find((p) => p.slug === prodParam || p._id === prodParam) || PRODUCTS.find((p) => p.slug === prodParam || p._id === prodParam);
           if (found) {
             setSelectedProduct(found);
             return;
@@ -155,7 +156,8 @@ export default function App() {
       }
       const prodParam = url.searchParams.get('product');
       if (prodParam) {
-        const found = PRODUCTS.find((p) => p.slug === prodParam || p._id === prodParam);
+        const liveList = getLiveProducts();
+        const found = liveList.find((p) => p.slug === prodParam || p._id === prodParam) || PRODUCTS.find((p) => p.slug === prodParam || p._id === prodParam);
         if (found) {
           setSelectedProduct(found);
         }

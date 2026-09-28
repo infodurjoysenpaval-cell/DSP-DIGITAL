@@ -1,4 +1,11 @@
 import { AffiliateApplication, AffiliatePayoutRequest, UserProfile } from '../types';
+import {
+  syncAffiliateToFirestore,
+  updateAffiliateStatusInFirestore,
+  deleteAffiliateFromFirestore,
+  fetchAffiliatesFromFirestore,
+  syncUserToFirestore,
+} from './firebase';
 
 const AFFILIATE_STORAGE_KEY = 'dsp_affiliate_applications';
 const ACTIVE_REFERRAL_CODE_KEY = 'dsp_active_referral_code';
@@ -79,6 +86,32 @@ const DEFAULT_APPLICATIONS: AffiliateApplication[] = [
   },
 ];
 
+export async function syncAffiliatesFromServer(): Promise<AffiliateApplication[]> {
+  try {
+    if (typeof window !== 'undefined') {
+      // 1. Fetch from Firestore first for authoritative cloud persistence
+      const firestoreAffs = await fetchAffiliatesFromFirestore();
+      if (firestoreAffs && Array.isArray(firestoreAffs) && firestoreAffs.length > 0) {
+        localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(firestoreAffs));
+        window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
+        return firestoreAffs;
+      }
+
+      // 2. Fallback to server endpoint
+      const res = await fetch('/api/affiliates');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.affiliates && Array.isArray(data.affiliates) && data.affiliates.length > 0) {
+          localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(data.affiliates));
+          window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
+          return data.affiliates;
+        }
+      }
+    }
+  } catch {}
+  return getAffiliateApplications();
+}
+
 export function getAffiliateApplications(): AffiliateApplication[] {
   try {
     const raw = localStorage.getItem(AFFILIATE_STORAGE_KEY);
@@ -147,6 +180,24 @@ export function saveAffiliateApplication(
   try {
     localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(all));
     window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
+
+    // Sync to Firestore for real-time admin sync & cloud persistence
+    syncAffiliateToFirestore(newApp).catch(() => {});
+
+    // Post to server so Admin gets the data on any device
+    if (typeof window !== 'undefined') {
+      fetch('/api/affiliates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newApp),
+      }).catch(() => {});
+
+      try {
+        const bc = new BroadcastChannel('dsp_affiliate_channel');
+        bc.postMessage({ type: 'AFFILIATE_SAVED', app: newApp });
+        bc.close();
+      } catch {}
+    }
   } catch (e) {
     console.error('Failed to save affiliate app', e);
   }
@@ -184,6 +235,24 @@ export function updateAffiliateStatus(
     try {
       localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(all));
       window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
+
+      // Update in Firestore
+      updateAffiliateStatusInFirestore(id, status, notes).catch(() => {});
+
+      // Sync status to server
+      if (typeof window !== 'undefined') {
+        fetch(`/api/affiliates/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status, notes }),
+        }).catch(() => {});
+
+        try {
+          const bc = new BroadcastChannel('dsp_affiliate_channel');
+          bc.postMessage({ type: 'AFFILIATE_STATUS_UPDATED', id, status });
+          bc.close();
+        } catch {}
+      }
 
       // Also sync user in registered users
       const regUsersRaw = localStorage.getItem('dsp_registered_users');
@@ -228,10 +297,57 @@ export function updateAffiliateStatus(
 }
 
 export function deleteAffiliateApplication(id: string): void {
+  const target = getAffiliateApplications().find((a) => a.id === id);
   const all = getAffiliateApplications().filter((a) => a.id !== id);
   try {
     localStorage.setItem(AFFILIATE_STORAGE_KEY, JSON.stringify(all));
     window.dispatchEvent(new CustomEvent('dsp_affiliate_updated'));
+
+    // Wipe from Firestore permanently
+    deleteAffiliateFromFirestore(id).catch(() => {});
+
+    // Server wipe
+    if (typeof window !== 'undefined') {
+      fetch(`/api/affiliates/${id}`, { method: 'DELETE' }).catch(() => {});
+
+      try {
+        const bc = new BroadcastChannel('dsp_affiliate_channel');
+        bc.postMessage({ type: 'AFFILIATE_DELETED', id });
+        bc.close();
+      } catch {}
+    }
+
+    // Reset user status if linked
+    if (target) {
+      const regUsersRaw = localStorage.getItem('dsp_registered_users');
+      if (regUsersRaw) {
+        const users = JSON.parse(regUsersRaw);
+        const uIdx = users.findIndex(
+          (u: any) =>
+            u.id === target.userId ||
+            (target.email && u.email?.toLowerCase() === target.email?.toLowerCase())
+        );
+        if (uIdx >= 0) {
+          delete users[uIdx].affiliateStatus;
+          users[uIdx].isAffiliate = false;
+          localStorage.setItem('dsp_registered_users', JSON.stringify(users));
+        }
+      }
+
+      const currentRaw = localStorage.getItem('dsp_current_user');
+      if (currentRaw) {
+        const cur = JSON.parse(currentRaw);
+        if (
+          cur.id === target.userId ||
+          (target.email && cur.email?.toLowerCase() === target.email?.toLowerCase())
+        ) {
+          delete cur.affiliateStatus;
+          cur.isAffiliate = false;
+          localStorage.setItem('dsp_current_user', JSON.stringify(cur));
+          window.dispatchEvent(new CustomEvent('dsp_user_updated', { detail: cur }));
+        }
+      }
+    }
   } catch (e) {
     console.error('Failed to delete affiliate application', e);
   }
